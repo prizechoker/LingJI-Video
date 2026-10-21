@@ -1,0 +1,21 @@
+import * as go from './go.js';
+import * as now from './now.js';
+import * as title from './title.js';
+import * as cart from './cart.js';
+import * as moravec from './moravec.js';
+import * as factory from './factory.js';
+import * as simple from './simple.js';
+import * as warehouse from './warehouse.js';
+import * as floor from './floor.js';
+import * as dish from './dish.js';
+import * as home from './home.js';
+import * as turn from './turn.js';
+import * as design from './design.js';
+import * as gala from './gala.js';
+import * as twoways from './twoways.js';
+import * as teleop from './teleop.js';
+import * as hands from './hands.js';
+import * as ending from './ending.js';
+import * as posetest from './posetest.js';
+
+export const SCENES = { go, now, title, cart, moravec, factory, simple, warehouse, floor, dish, home, turn, design, gala, twoways, teleop, hands, ending, posetest };

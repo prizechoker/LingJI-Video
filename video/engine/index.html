@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>render</title>
+<link rel="stylesheet" href="../node_modules/@fontsource-variable/noto-serif-sc/index.css">
+<link rel="stylesheet" href="../node_modules/@fontsource-variable/noto-sans-sc/index.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/jetbrains-mono/400.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/jetbrains-mono/500.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/jetbrains-mono/700.css">
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="out"></canvas>
+<script type="importmap">
+{ "imports": { "three": "../node_modules/three/build/three.module.js", "three/addons/": "../node_modules/three/examples/jsm/" } }
+</script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

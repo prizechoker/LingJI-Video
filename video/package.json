@@ -1,0 +1,12 @@
+{
+  "name": "lingji-video-ep01",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic frame renderer for episode videos",
+  "dependencies": {
+    "@fontsource-variable/noto-sans-sc": "^5.3.1",
+    "@fontsource-variable/noto-serif-sc": "^5.3.1",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "three": "^0.170.0"
+  }
+}
