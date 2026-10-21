@@ -61,9 +61,13 @@ utm = HFModel.from_pretrained("prj-beatrice/utmosv2-torch-native", trust_remote_
 units = json.load(open(args.script, encoding="utf-8"))["units"]
 forced = dict(x.split("=") for x in args.force.split(",") if x)
 report, chosen = [], {}
+missing = []
 for u in units:
     exp = py(u["tts"])
     best = None
+    if not glob.glob(os.path.join(args.takes, f"{u['id']}_t*.wav")):
+        missing.append(u["id"])
+        continue
     for f in sorted(glob.glob(os.path.join(args.takes, f"{u['id']}_t*.wav"))):
         y, sr = sf.read(f, dtype="float32")
         y = y if y.ndim == 1 else y.mean(1)
@@ -92,8 +96,15 @@ for u in units:
         best = next(x for x in report if x["unit"] == u["id"] and x["take"] == int(forced[u["id"]]))
     chosen[u["id"]] = best
 
+json.dump(report, open(os.path.join(args.out, "takes_report.json"), "w"), ensure_ascii=False, indent=1)
+if missing:
+    print("MISSING", missing, "- evaluation only, narration not assembled")
+    raise SystemExit(0)
 # ---- assemble narration with designed pauses; collect char timestamps
+import pyloudnorm as pyln  # noqa: E402
+
 SR = 24000
+meter = pyln.Meter(SR, block_size=0.2)
 track, units_out, t = [], [], 0.25
 track.append(np.zeros(int(SR * t), dtype=np.float32))
 for u in units:
@@ -106,6 +117,10 @@ for u in units:
     a0 = max(0, iv[0][0] - int(0.05 * SR))
     a1 = min(len(y), iv[-1][1] + int(0.08 * SR))
     y = y[a0:a1]
+    # even out level between units (takes come out of the model at slightly different loudness)
+    lu = meter.integrated_loudness(y)
+    if np.isfinite(lu):
+        y = y * 10 ** (np.clip(-20.0 - lu, -6, 6) / 20)
     fade = int(0.012 * SR)
     y[:fade] *= np.linspace(0, 1, fade)
     y[-fade:] *= np.linspace(1, 0, fade)

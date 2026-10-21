@@ -163,6 +163,9 @@ export function draw(pen, t, p) {
       const rows = Math.min(3, 1 + Math.floor(Math.max(0, t - tSame - 0.8) / 1.2));
       for (let r = 0; r < rows; r++) text(pen.ui, `第${r + 1}次   X 1950.0   Y 620.0   Z -620.0`, sp.x + 60, sp.y + 70 + r * 30, { size: 18, font: FONT.mono, weight: 500, color: PAL.gold, a: sameA, align: 'left', spacing: 1 });
     }
+    // term chip for experts (on screen only)
+    const termA = smoothstep(tSame + 1.6, tSame + 2.2, t) * (1 - smoothstep(tBoardWord + 1.2, tBoardWord + 1.8, t));
+    label(pen, 140, 268, { en: 'STRUCTURED ENVIRONMENT', zh: '结构化环境', a: termA, color: PAL.gold, rule: 200 });
     // caption: Unimate
     const capA = smoothstep(tUni + 0.3, tUni + 0.9, t) * (1 - smoothstep(tBoard - 0.3, tBoard + 0.3, t));
     label(pen, 140, 170, { en: 'UNIMATE · 1961 · GENERAL MOTORS', zh: '第一台投入生产的工业机器人', a: capA, color: PAL.cool, rule: 220 });

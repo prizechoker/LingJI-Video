@@ -50,6 +50,20 @@ def chord_bed(t0, t1, names, bright=0.6, gain=0.5, with_cello=True, cello_dyn="p
             T["cello"].add(st, cello(m, seg + 0.2, cello_dyn, attack=0.6, release=1.2), 0.5 * gain)
 
 
+def chord_grid(t0, t1, names, bright=0.55, gain=0.35, with_cello=True):
+    """pad (+cello) on the same 2-bar grid as arp(): chord k occupies [t0 + k*8 beats, ...)"""
+    bar2 = 8 * BEAT
+    k = 0
+    while t0 + k * bar2 < t1:
+        st = t0 + k * bar2
+        dur = min(bar2, t1 - st)
+        notes, bass = CH[names[k % len(names)]]
+        T["pad"].add(st, pad(notes, dur + 0.25, a=0.8 if k == 0 else 0.35, r=1.2, bright=bright), gain)
+        if with_cello:
+            T["cello"].add(st, cello(bass + 12 if bass < 36 else bass, dur + 0.15, "pp", attack=0.5, release=1.0), 0.5 * gain)
+        k += 1
+
+
 def arp(t0, t1, names, vel=0.5, octave=0, every=BEAT / 2, gain=0.6):
     """8th-note arpeggio through chord tones; chords change every 2 bars"""
     t, i = t0, 0
@@ -123,7 +137,7 @@ title = S("title")
 T["sfx"].add(title["start"] - 1.6, riser(1.9, 0.45), 0.7)
 t_title = cue("title", "title")
 T["sfx"].add(t_title - 0.05, impact(0.7), 0.75)
-T["synth"].add(t_title, shimmer(2.6, 0.32, 84), 0.6)
+T["synth"].add(t_title, shimmer(2.6, 0.32, 86), 0.6)
 T["pad"].add(t_title - 0.05, pad(CH["Dm9"][0], title["end"] - t_title + 0.6, a=0.15, r=1.4, bright=0.55), 0.5)
 T["cello"].add(t_title - 0.05, cello(38, title["end"] - t_title + 0.4, "pp", attack=0.2, release=1.2), 0.55)
 
@@ -164,7 +178,7 @@ fa = S("factory")
 f0, f1 = fa["start"], S("dish")["end"]
 arp(f0, f1, ["Dm", "Bb", "F", "C"], vel=0.42, gain=0.5)
 drums(f0 + 4 * BEAT, f1, vel=0.32, half=True)
-chord_bed(f0, f1, ["Dm9", "Bbmaj7", "Fmaj9", "Csus2"] * 3, bright=0.5, gain=0.32, with_cello=True)
+chord_grid(f0, f1, ["Dm9", "Bbmaj7", "Fmaj9", "Csus2"], bright=0.5, gain=0.32)
 uni = cue("factory", "unimate")
 T["sfx"].add(uni - 0.4, whoosh(0.8, 0.3), 0.6)
 for k in range(6):  # hydraulic grabs
@@ -200,7 +214,7 @@ roll(but + 0.15, [41, 48, 53, 57, 60, 64], vel=0.5, gain=0.85, dur=4.0)
 T["pad"].add(but + 0.1, pad(CH["Fmaj9"][0], ins["end"] - but + 0.6, a=0.3, r=2.0, bright=0.7), 0.55)
 T["cello"].add(but + 0.1, cello(53, ins["end"] - but + 0.4, "mf", attack=0.5, release=1.6), 0.45)
 T["cello"].add(but + 0.1, cello(41, ins["end"] - but + 0.4, "pp", attack=0.5, release=1.6), 0.5)
-T["synth"].add(but + 0.2, shimmer(3.0, 0.3, 84), 0.55)
+T["synth"].add(but + 0.2, shimmer(3.0, 0.3, 86), 0.55)
 
 # --- home: warm solo piano (F major), playful cat
 ho = S("home")
@@ -225,9 +239,9 @@ for k in range(3):
 # --- humanoids: pulse returns; gala bells; race finish
 tu, ga = S("turn"), S("gala")
 u0, u1 = tu["start"], ga["end"]
-arp(u0 + 1.0, u1, ["Dm", "Bb", "F", "C"], vel=0.48, gain=0.55)
+arp(u0, u1, ["Dm", "Bb", "F", "C"], vel=0.48, gain=0.55)
 drums(S("design")["start"] + 2 * BEAT, u1, vel=0.4)
-chord_bed(u0, u1, ["Dm9", "Bbmaj7", "Fmaj9", "Csus2"], bright=0.55, gain=0.3)
+chord_grid(u0, u1, ["Dm9", "Bbmaj7", "Fmaj9", "Csus2"], bright=0.55, gain=0.3)
 for k in range(10):
     T["synth"].add(ga["start"] + 0.2 + k * 0.25, bell(84 + [0, 4, 7, 12][k % 4], 0.9, 0.3), 0.4, pan=(k % 5 - 2) / 3)
 T["sfx"].add(cue("gala", "race") - 0.3, whoosh(0.7, 0.3), 0.5)
@@ -249,8 +263,9 @@ cb, hs = S("go", 1), S("hands")
 k0, k1 = cb["start"], hs["end"]
 motif(k0 + 0.3, [69, 74, 76, 77, 76, 74, 72, 69, 72, 74], step=BEAT * 2, vel=0.42, gain=0.85)
 chord_bed(k0, k1, ["Fmaj9", "Csus2", "Dm9", "Bbmaj7"], bright=0.55, gain=0.38, with_cello=False)
-for k, (m, d) in enumerate([(50, 2.5), (53, 2.5), (57, 2.5), (55, 3.0)]):
-    T["cello"].add(k0 + 0.4 + k * 2.5, cello(m, d, "mf" if k > 1 else "pp", attack=0.7, release=1.2), 0.5)
+seg = (k1 - k0) / 4
+for k, m in enumerate([57, 55, 53, 50]):
+    T["cello"].add(k0 + k * seg + 0.1, cello(m, seg + 0.2, "mf" if k in (1, 2) else "pp", attack=0.7, release=1.2), 0.5)
 T["sfx"].add(cue("hands", "wash"), bq(stereo(noise(int(1.1 * SR)) * env_adsr(int(1.1 * SR), 0.1, 0.2, 0.8, 0.3)), "bandpass", [900, 6000]), 0.1)
 T["sfx"].add(cue("hands", "cap") + 0.2, tick(0.4, 1800), 0.5)
 T["sfx"].add(cue("hands", "cap") + 0.5, tick(0.4, 1700), 0.5)

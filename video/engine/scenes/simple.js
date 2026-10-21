@@ -92,7 +92,7 @@ export function draw(pen, t, p) {
     if (ba > 0) line(pen, 960 - 150, y + 2, 960 - 150 + 300 * ba, y + 2, { color: PAL.dim, a: 0.6 * ba, w: 2, glow: 0 });
   }
   if (ba > 0) {
-    glowText(pen, '而是世界变简单了', 960, 500, { size: 78, font: FONT.serif, weight: 800, color: [246, 222, 170], glowColor: PAL.gold, glow: 0.4, a: ba, spacing: 10 });
-    text(ui, '而是世界变简单了', 960, 500, { size: 78, font: FONT.serif, weight: 800, color: [246, 222, 170], a: ba, spacing: 10 });
+    glowText(pen, '而是我们把世界变简单了', 960, 500, { size: 72, font: FONT.serif, weight: 800, color: [246, 222, 170], glowColor: PAL.gold, glow: 0.4, a: ba, spacing: 8 });
+    text(ui, '而是我们把世界变简单了', 960, 500, { size: 72, font: FONT.serif, weight: 800, color: [246, 222, 170], a: ba, spacing: 8 });
   }
 }

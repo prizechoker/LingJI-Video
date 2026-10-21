@@ -1,7 +1,7 @@
 // U17–U18: one place cannot become a board — your home. Bowls differ, clothes get tossed, the cat jumps on the table.
 import { THREE, projector, render3 } from '../core/three.js';
 import { W, H, PAL, rgba } from '../core/stage.js';
-import { line, text, glowText, FONT, lightDot, polyline } from '../core/draw.js';
+import { line, text, glowText, label, FONT, lightDot, polyline } from '../core/draw.js';
 import { clamp, lerp, smoothstep, ease, rng, noise2 } from '../core/math.js';
 import { wire, boxLines, chairLines } from './lib/wire.js';
 import { warmMat, makeVessel, chopsticks } from './lib/props.js';
@@ -77,6 +77,7 @@ export function draw(pen, t, p) {
     polyline(pen, [[hx - 230, hy + 170], [hx - 230, hy - 40], [hx, hy - 230], [hx + 230, hy - 40], [hx + 230, hy + 170], [hx - 230, hy + 170]], hA, { color: PAL.warm, a: hA * 0.9, w: 2.4, glow: 1 });
     polyline(pen, [[hx - 50, hy + 170], [hx - 50, hy + 40], [hx + 50, hy + 40], [hx + 50, hy + 170]], hA, { color: PAL.warm, a: hA * 0.8, w: 2, glow: 0.8 });
     lightDot(pen, hx, hy - 60, 120, PAL.warm, 0.18 * hA);
+    label(pen, 140, 170, { en: 'UNSTRUCTURED ENVIRONMENT', zh: '非结构化环境', a: hA, color: PAL.warm, rule: 220 });
     if (hA > 0) {
       glowText(pen, '你家', hx, hy - 330, { size: 64, font: FONT.serif, weight: 700, color: [255, 226, 186], glowColor: PAL.warm, glow: 0.5, a: hA, spacing: 14 });
       text(pen.ui, '变不成棋盘的地方', hx, hy - 268, { size: 20, font: FONT.sans, weight: 400, color: PAL.dim, a: hA, spacing: 4 });
