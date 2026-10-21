@@ -18,4 +18,12 @@ node tools/render.mjs --scale "$SCALE" --workers "$WORKERS" --crf 14 --out "out/
 ffmpeg -y -loglevel error -i "out/film_${TAG}.mp4" -i audio/mix.wav -map 0:v -map 1:a \
   -c:v copy -c:a aac -b:a 320k -ar 48000 -movflags +faststart -shortest "out/ep01_${TAG}.mp4"
 node tools/still.mjs --proto cover --t 0 --scale "$SCALE" --out out/cover >/dev/null
+# covers: 16:9 as rendered, plus a centred 16:10 crop (text is kept inside its safe area)
+python3 -c "
+from PIL import Image
+im = Image.open('out/cover_0.00.png').convert('RGB'); w, h = im.size
+im.save('out/cover_16x9.jpg', quality=95)
+cw = round(h * 1.6); x0 = (w - cw) // 2
+im.crop((x0, 0, x0 + cw, h)).save('out/cover_16x10.jpg', quality=95)
+"
 echo "done: out/ep01_${TAG}.mp4"

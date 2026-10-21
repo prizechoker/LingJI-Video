@@ -161,7 +161,9 @@ export function draw(pen, t, p) {
       line(pen, sp.x, sp.y - cr * 1.6, sp.x, sp.y + cr * 1.6, { color: PAL.gold, a: sameA, w: 1.4, glow: 0.7 });
       circle(pen, sp.x, sp.y, cr, { color: PAL.gold, a: sameA, w: 1.4, glow: 0.7 });
       const rows = Math.min(3, 1 + Math.floor(Math.max(0, t - tSame - 0.8) / 1.2));
-      for (let r = 0; r < rows; r++) text(pen.ui, `第${r + 1}次   X 1950.0   Y 620.0   Z -620.0`, sp.x + 60, sp.y + 70 + r * 30, { size: 18, font: FONT.mono, weight: 500, color: PAL.gold, a: sameA, align: 'left', spacing: 1 });
+      // identical coordinates every time; kept inside the frame whichever side of the target they sit
+      const right = sp.x + 60 + 300 < 1800;
+      for (let r = 0; r < rows; r++) text(pen.ui, `第${r + 1}次   X 1950.0   Y 620.0`, right ? sp.x + 60 : sp.x - 60, sp.y + 70 + r * 30, { size: 18, font: FONT.mono, weight: 500, color: PAL.gold, a: sameA, align: right ? 'left' : 'right', spacing: 1 });
     }
     // term chip for experts (on screen only)
     const termA = smoothstep(tSame + 1.6, tSame + 2.2, t) * (1 - smoothstep(tBoardWord + 1.2, tBoardWord + 1.8, t));

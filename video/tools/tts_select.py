@@ -21,6 +21,7 @@ ap.add_argument("--script", default="data/script.json")
 ap.add_argument("--takes", default="audio/takes")
 ap.add_argument("--out", default="audio")
 ap.add_argument("--force", default="", help="comma list UNIT=take overrides, e.g. U03=2")
+ap.add_argument("--reuse", action="store_true", help="skip scoring: reuse audio/takes_report.json and only re-assemble")
 args = ap.parse_args()
 torch.set_num_threads(int(os.environ.get("SEL_THREADS", "3")))
 
@@ -62,7 +63,19 @@ units = json.load(open(args.script, encoding="utf-8"))["units"]
 forced = dict(x.split("=") for x in args.force.split(",") if x)
 report, chosen = [], {}
 missing = []
+if args.reuse:
+    report = json.load(open(os.path.join(args.out, "takes_report.json"), encoding="utf-8"))
 for u in units:
+    if args.reuse:
+        recs = [x for x in report if x["unit"] == u["id"]]
+        if not recs:
+            missing.append(u["id"])
+            continue
+        best = max(recs, key=lambda x: x["score"])
+        if u["id"] in forced:
+            best = next(x for x in recs if x["take"] == int(forced[u["id"]]))
+        chosen[u["id"]] = best
+        continue
     exp = py(u["tts"])
     best = None
     if not glob.glob(os.path.join(args.takes, f"{u['id']}_t*.wav")):
@@ -126,13 +139,18 @@ for u in units:
     y[-fade:] *= np.linspace(1, 0, fade)
     y16 = librosa.resample(y, orig_sr=SR, target_sr=16000)
     r = asr.generate(input=y16, disable_pbar=True)[0]
-    ts = r.get("timestamp", [])
-    chars = [c for c in re.sub(r"\s", "", r["text"])]
+    # one timestamp per ASR token; a Latin token ("alpha", "go", "ai") spans several letters, so share its time out
+    toks, ts = r["text"].split(), r.get("timestamp", [])
+    if len(toks) != len(ts):
+        print("WARN token/timestamp count mismatch", u["id"], len(toks), len(ts))
     start = t
+    chars = []
+    for tok, (a, e) in zip(toks, ts):
+        for j, c in enumerate(tok):
+            chars.append([c, round(start + (a + (e - a) * j / len(tok)) / 1000, 3), round(start + (a + (e - a) * (j + 1) / len(tok)) / 1000, 3)])
     track.append(y)
     t += len(y) / SR
-    units_out.append(dict(id=u["id"], start=round(start, 3), end=round(t, 3), take=b["take"], asr=r["text"],
-                          chars=[[c, round(start + a / 1000, 3), round(start + e / 1000, 3)] for c, (a, e) in zip(chars, ts)]))
+    units_out.append(dict(id=u["id"], start=round(start, 3), end=round(t, 3), take=b["take"], asr=r["text"], chars=chars))
     pause = u.get("pause", 0.4)
     track.append(np.zeros(int(SR * pause), dtype=np.float32))
     t += pause

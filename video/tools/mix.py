@@ -39,6 +39,19 @@ def compress(x, thr_db=-22, ratio=2.5, attack=0.008, release=0.12, makeup_db=0):
     return x * (g[:, None] if x.ndim > 1 else g)
 
 
+def rms_compress(x, thr_db=-21, ratio=4.0, attack=0.02, release=0.35):
+    """bus compressor with an RMS (loudness-like) detector: tames hits and swells, leaves the texture alone"""
+    k = 48
+    pw = (x ** 2).mean(1)
+    pw = pw[: len(pw) // k * k].reshape(-1, k).mean(1)
+    env = env_follow(pw, attack, release, rate=SR / k)
+    lvl = 10 * np.log10(np.maximum(env, 1e-12))
+    gr_db = -np.maximum(0, lvl - thr_db) * (1 - 1 / ratio)
+    g = np.repeat(10 ** (gr_db / 20), k)
+    g = np.pad(g, (0, len(x) - len(g)), mode="edge")
+    return x * g[:, None]
+
+
 def deess(x, f=6500, thr_db=-30, ratio=4):
     band = bq(x, "highpass", f, 4)
     rest = x - band
@@ -89,17 +102,24 @@ m_l = meter.integrated_loudness(music + 1e-9)
 music = music * 10 ** ((-19.0 - m_l) / 20)
 s_l = meter.integrated_loudness(sfx + 1e-9)
 sfx = sfx * 10 ** ((-25.0 - s_l) / 20)
-mix = voice + music * duck_m[:, None] + sfx * duck_s[:, None]
+# bus compression on music + sfx: hits and swells stay below the voice instead of jumping over it
+bed = rms_compress(music * duck_m[:, None] + sfx * duck_s[:, None], thr_db=-21, ratio=4.0)
+mix = voice + bed
 
 # ---- master
 mix = bq(mix, "highpass", 25, 2)
 l0 = meter.integrated_loudness(mix)
-mix = mix * 10 ** ((-14.0 - l0) / 20)
-mix = limiter(mix, -1.2)
+g0 = 10 ** ((-14.0 - l0) / 20)
+mix = limiter(mix * g0, -1.2)
+# the limiter shaves a little loudness off the peaks: correct once and limit again
 l1 = meter.integrated_loudness(mix)
+mix = limiter(mix * 10 ** ((-14.0 - l1) / 20), -1.2)
+l1 = meter.integrated_loudness(mix)
+# bed stem (music + sfx as heard under the voice), for review plots
+sf.write("audio/bed.wav", (bed * g0).astype(np.float32), SR, subtype="PCM_24")
 sf.write("audio/mix.wav", mix.astype(np.float32), SR, subtype="PCM_24")
-sf.write("audio/voice_proc.wav", voice.astype(np.float32), SR, subtype="PCM_24")
-stats = dict(lufs=round(l1, 2), peak_db=round(20 * np.log10(np.abs(mix).max()), 2), voice_lufs=round(meter.integrated_loudness(voice), 2),
+sf.write("audio/voice_proc.wav", (voice * g0).astype(np.float32), SR, subtype="PCM_24")
+stats = dict(lufs=round(float(l1), 2), peak_db=round(float(20 * np.log10(np.abs(mix).max())), 2), voice_lufs=round(float(meter.integrated_loudness(voice * g0)), 2),
              music_under_voice_db=round(float(20 * np.log10(np.mean(duck_m[act > 0.8]) + 1e-9)), 1))
 json.dump(stats, open("audio/mix_stats.json", "w"), indent=1)
 print(stats)

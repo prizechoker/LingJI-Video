@@ -123,6 +123,7 @@ T["cello"].add(t_place, cello(46, t_now - t_place + 0.3, "pp", attack=0.4, relea
 
 # --- ten years later: flip/run energy, then the sink deflates it
 flip, run, sink = cue("now", "flip"), cue("now", "run"), cue("now", "sink")
+title_start = S("title")["start"]
 T["sfx"].add(t_now - 0.25, whoosh(0.8, 0.35), 0.8)
 arp(flip - BEAT * 2, sink, ["Dm", "Bb"], vel=0.5, gain=0.55)
 drums(flip, sink, vel=0.45)
@@ -131,13 +132,17 @@ T["pad"].add(flip - 0.4, pad(CH["Dm"][0], sink - flip + 0.4, a=0.4, r=0.4, brigh
 T["synth"].add(sink, pluck(62, 1.0, 0.4), 0.5)
 T["synth"].add(sink + 0.32, pluck(61, 1.2, 0.3), 0.45)
 for k in range(4):
-    T["sfx"].add(sink + 0.6 + k * 0.83, tick(0.25, 5200), 0.4, pan=-0.4)  # water drip
+    T["sfx"].add(sink + 0.6 + k * 0.83, tick(0.25, 5200), 0.85, pan=-0.4)  # water drip, the only sound left
+# a low floor under the deflation so it reads as a held breath, not a dropout
+T["cello"].add(sink + 0.4, cello(38, title_start - sink + 0.6, "pp", attack=1.2, release=0.8), 0.75)
+T["pad"].add(sink + 0.3, pad(CH["Dm"][0], title_start - sink + 0.4, a=1.0, r=0.8, bright=0.3), 0.2)
 # --- "为什么？" -> title
 title = S("title")
-T["sfx"].add(title["start"] - 1.6, riser(1.9, 0.45), 0.7)
+title_start = title["start"]
+T["sfx"].add(title["start"] - 1.6, riser(1.9, 0.45), 0.55)
 t_title = cue("title", "title")
-T["sfx"].add(t_title - 0.05, impact(0.7), 0.75)
-T["synth"].add(t_title, shimmer(2.6, 0.32, 86), 0.6)
+T["sfx"].add(t_title - 0.05, impact(0.7), 0.45)
+T["synth"].add(t_title, shimmer(2.6, 0.32, 86), 0.45)
 T["pad"].add(t_title - 0.05, pad(CH["Dm9"][0], title["end"] - t_title + 0.6, a=0.15, r=1.4, bright=0.55), 0.5)
 T["cello"].add(t_title - 0.05, cello(38, title["end"] - t_title + 0.4, "pp", attack=0.2, release=1.2), 0.55)
 

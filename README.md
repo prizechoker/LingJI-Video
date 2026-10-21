@@ -22,6 +22,8 @@
 | 画面 | `engine/` + `tools/render.mjs` | Canvas 2D + three.js 确定性逐帧渲染，多进程并行，输出 H.264 |
 | 配乐与音效 | `tools/score.py`、`tools/audiolib.py` | 原创编曲：真实钢琴（FreePats CC0）与大提琴（爱荷华大学 MIS）采样 + 合成器，按时间轴同步 |
 | 混音 | `tools/mix.py` | 人声链、音乐自动闪避、限幅，响度 -14 LUFS |
+| 成片 | `tools/finalize.sh` | 时间轴 → 配乐 → 混音 → 渲染 → 封装 → 字幕文件 → 封面，一条命令 |
+| 质检 | `tools/review_sheet.py` | 每句字幕、每个切点各取一帧拼成联系表，逐句核对音画是否一致 |
 
 ### 运行
 
@@ -34,6 +36,8 @@ python tools/build_timeline.py
 python tools/score.py && python tools/mix.py
 node tools/render.mjs --scale 1 --workers 3 --out out/film_1080.mp4
 ffmpeg -i out/film_1080.mp4 -i audio/mix.wav -c:v copy -c:a aac -b:a 320k -shortest out/ep01.mp4
+# 或者一步到位：tools/finalize.sh 1 3
+python tools/review_sheet.py out/ep01_1080.mp4 out/review                         # 质检联系表
 ```
 
 ### 素材与授权

@@ -113,15 +113,20 @@ export function draw(pen, t, p, env) {
     const tout = clamp((t - tRetreat) / 1.6);
     const { right, back } = S.approach;
     const at = (r, up, b) => V(target[0], 0, target[2]).add(right.clone().multiplyScalar(r)).add(V(0, up, 0)).add(back.clone().multiplyScalar(b));
-    const above = at(0.02, 0.035, 0.02);
+    const above = at(0.012, 0.05, 0.012); // straight above the target point, so the aim reads clearly
     const contact = at(0.012, 0.016, 0.012);
     const pts = [at(0.34, 0.2, 0.2), at(0.2, 0.12, 0.12), at(0.09, 0.07, 0.06), above, contact];
     let fingerTip;
     if (mode === 'callback') {
       // memory of the hand: it drifts in and hovers above the board, stone in its fingers
       const k = ease.outCubic(clamp(t / 2.2));
-      fingerTip = at(0.12, 0.09, 0.08).lerp(above, k).add(new THREE.Vector3(0, 0.004 * Math.sin(t * 1.7), 0));
-    } else if (t < tRetreat) fingerTip = path3(pts, ease.inOutCubic(tin));
+      fingerTip = at(0.12, 0.09, 0.08).lerp(above, k).lerp(contact, p.hoverMix || 0).add(new THREE.Vector3(0, 0.004 * Math.sin(t * 1.7), 0));
+    } else if (t < tRetreat) {
+      // reach in quickly (visible by "很少有人注意到"), hover and aim, then tap the stone down on the cue
+      const u = tin < 0.65 ? 0.75 * ease.outCubic(tin / 0.65) : tin < 0.86 ? 0.75 : 0.75 + 0.25 * ease.inOutSine((tin - 0.86) / 0.14);
+      const hover = smoothstep(0.55, 0.7, tin) * (1 - smoothstep(0.86, 0.9, tin));
+      fingerTip = path3(pts, u).add(V(0.002 * Math.sin(t * 2.3) * hover, 0.003 * Math.sin(t * 1.9) * hover, 0));
+    }
     else fingerTip = contact.clone().lerp(at(0.3, 0.17, 0.2), ease.inOutCubic(tout));
     // wrist sits back along the approach direction
     const dir = right.clone().multiplyScalar(-0.62).add(back.clone().multiplyScalar(-0.42)).add(V(0, -0.66, 0)).normalize();

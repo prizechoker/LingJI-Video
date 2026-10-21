@@ -86,10 +86,10 @@ export function draw(pen, t, p) {
       line(pen, qa.x, qa.y, qb.x, qb.y, { color: PAL.gold, a: lk * 0.9, w: 2, glow: 1 });
     }
     const hp = P(a.x, a.y, a.z);
-    label(pen, hp.x + 60, hp.y - 80, { en: 'TELEOPERATION', zh: '远处的真人 · 戴着VR眼镜', a: lk, color: PAL.warm, rule: 160 });
+    label(pen, Math.min(hp.x + 60, 1500), hp.y - 80, { en: 'TELEOPERATION', zh: '远处的真人 · 戴着VR眼镜', a: lk, color: PAL.warm, rule: 160 });
   }
   const rp = P(-2.2, 2.0, 0);
-  label(pen, Math.max(140, rp.x - 260), 170, { en: 'HOME ROBOT · HARD CHORE', zh: '家务机器人：遇到复杂的活儿', a: smoothstep(0.2, 0.7, t) * fade, color: PAL.cool, rule: 220 });
+  label(pen, Math.max(140, rp.x - 600), 170, { en: 'HOME ROBOT · HARD CHORE', zh: '家务机器人：遇到复杂的活儿', a: smoothstep(0.2, 0.7, t) * fade, color: PAL.cool, rule: 220 });
   const na = smoothstep(tFar + 0.4, tFar + 1.0, t) * fade;
   text(pen.ui, '遥操作也是采集机器人训练数据的主要方式之一', 960, 880, { size: 17, font: FONT.sans, weight: 400, color: PAL.dim, a: na * 0.9, spacing: 1 });
 }

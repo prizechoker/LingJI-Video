@@ -107,7 +107,7 @@ SB = [
     dict(scene="design", start=A("U20", "^", -0.1), end=A("U20", "$", 0.3), fadeIn=0.25, p=dict(tint="warm"),
          cues=dict(door=A("U20", "门把手", -0.05), stairs=A("U20", "楼梯", -0.05), pan=A("U20", "锅铲", -0.05), morph=A("U20", "那干脆", 0.1))),
     dict(scene="gala", start=A("U21", "^", -0.1), end=A("U21", "$", 0.3), fadeIn=0.25,
-         cues=dict(race=A("U21", "还在半马", -0.1))),
+         cues=dict(race=A("U21", "还在半马", -0.1), win=A("U21", "跑赢了", 0.0))),
     dict(scene="twoways", start=A("U22", "^", -0.1), end=A("U22", "$", 0.35), fadeIn=0.25,
          cues=dict(bowls=A("U22", "和面对", 0.0), two=A("U22", "是两回事", -0.1))),
     dict(scene="teleop", start=A("U23", "^", -0.1), end=A("U23", "$", 0.6), fadeIn=0.25,

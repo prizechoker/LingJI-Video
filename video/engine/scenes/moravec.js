@@ -24,14 +24,17 @@ export function draw(pen, t, p) {
   const dur = p.dur || 11;
   const tName = 0, tSay = c.say ?? 2.6, tEasy = c.easy ?? 3.6, tHard = c.hard ?? 5.6, tLook = c.look ?? 7.4, tWalk = c.walk ?? 8.2, tGrab = c.grab ?? 9.0;
   // name card
-  const na = smoothstep(0.1, 0.6, t) * (1 - smoothstep(tSay + 0.2, tSay + 0.8, t));
+  // the name card lifts away before the balance draws in, so the beam never crosses the name
+  const out = smoothstep(tSay - 0.15, tSay + 0.3, t);
+  const na = smoothstep(0.1, 0.6, t) * (1 - out);
   if (na > 0) {
-    text(pen.ui, '汉斯·莫拉维克', 960, 470, { size: 64, font: FONT.serif, weight: 700, color: [240, 234, 224], a: na, spacing: 6 });
-    text(pen.ui, 'HANS MORAVEC', 960, 540, { size: 18, font: FONT.mono, weight: 500, color: PAL.dim, a: na, spacing: 10 });
-    text(pen.ui, '当年斯坦福的博士生，后来成为卡内基梅隆大学的机器人学家', 960, 590, { size: 21, font: FONT.sans, weight: 400, color: [190, 198, 208], a: na * 0.9, spacing: 1 });
+    const dy = -30 * out;
+    text(pen.ui, '汉斯·莫拉维克', 960, 470 + dy, { size: 64, font: FONT.serif, weight: 700, color: [240, 234, 224], a: na, spacing: 6 });
+    text(pen.ui, 'HANS MORAVEC', 960, 540 + dy, { size: 18, font: FONT.mono, weight: 500, color: PAL.dim, a: na, spacing: 10 });
+    text(pen.ui, '当年斯坦福的博士生，后来成为卡内基梅隆大学的机器人学家', 960, 590 + dy, { size: 21, font: FONT.sans, weight: 400, color: [190, 198, 208], a: na * 0.9, spacing: 1 });
   }
   // the balance
-  const ba = smoothstep(tSay - 0.1, tSay + 0.6, t);
+  const ba = smoothstep(tSay + 0.1, tSay + 0.7, t);
   if (ba <= 0) return;
   const cx = 960, cy = 540;
   // tilt: easy side rises as the hard side gets heavier
@@ -43,7 +46,8 @@ export function draw(pen, t, p) {
   // fulcrum
   polyline(pen, [[cx - 60, cy + 150], [cx, cy - 60], [cx + 60, cy + 150]], ba, { color: PAL.cool, a: 0.6 * ba, w: 2, glow: 0.4 });
   line(pen, cx - 140, cy + 150, cx + 140, cy + 150, { color: PAL.cool, a: 0.4 * ba, w: 1.5, glow: 0.3 });
-  line(pen, lx, ly, rx, ry, { color: PAL.cool, a: 0.9 * ba, w: 2.6, glow: 0.8 });
+  const grow = ease.outCubic(ba); // the beam grows out from the pivot
+  line(pen, cx + (lx - cx) * grow, cy - 60 + (ly - cy + 60) * grow, cx + (rx - cx) * grow, cy - 60 + (ry - cy + 60) * grow, { color: PAL.cool, a: 0.9 * ba, w: 2.6, glow: 0.8 });
   lightDot(pen, cx, cy - 60, 14, PAL.cool, 0.8 * ba);
   // pans hang from beam ends
   const pan = (x, y, col, aa) => {
