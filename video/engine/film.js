@@ -2,6 +2,7 @@
 import { SCENES } from './scenes/registry.js';
 import { drawSubtitles } from './core/subtitles.js';
 import { drawChrome } from './core/chrome.js';
+import { drawAtmos } from './core/atmos.js';
 import { clamp, smoothstep } from './core/math.js';
 
 export class Film {
@@ -38,6 +39,10 @@ export class Film {
     const env = { t, frame, fps: this.fps, cues: this.cues || {}, film: this };
     st.bgTint = null;
     st.bloom = 1;
+    // atmosphere follows the tint of the shot that is fully on screen
+    let tint = 'cool', amt = 1;
+    for (const s of this.shots) if (t >= s.start && t < s.end) { tint = (s.p && s.p.tint) || 'cool'; amt = s.p && s.p.atmos != null ? s.p.atmos : 1; }
+    drawAtmos(pen, t, tint, amt);
     for (const s of this.shots) {
       const fi = s.fadeIn ?? 0.0;
       const fo = s.fadeOut ?? 0.0;

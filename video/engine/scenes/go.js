@@ -82,7 +82,7 @@ export function draw(pen, t, p, env) {
   for (let i = 0; i < 19; i++) for (let j = 0; j < 19; j++) {
     const col = board[i][j];
     if (!col) continue;
-    stoneAt(pen, P, i, j, col === 'B' ? 'black' : 'white', { a: stoneIn(i, j), focusZ: P(target[0], 0, target[2]).z, dof: 34 });
+    stoneAt(pen, P, i, j, col === 'B' ? 'black' : 'white', { a: stoneIn(i, j), focusZ: P(target[0], 0, target[2]).z, dof: 26 });
   }
 
   // ---- AI thinking: policy heatmap over candidate points, converging on P10
@@ -101,9 +101,9 @@ export function draw(pen, t, p, env) {
   const ghost = smoothstep(tGhost, tGhost + 0.5, t) * (1 - smoothstep(tPlace - 0.05, tPlace + 0.1, t));
   if (ghost > 0.001) {
     const pulse = 0.65 + 0.35 * Math.sin(t * 5.0);
-    planeCircle(pen, P, target[0], target[2], G * 0.47, { color: PAL.cyan, a: ghost * pulse, w: 1.6, dash: [4, 5] });
+    planeCircle(pen, P, target[0], target[2], G * 0.47, { color: PAL.cyan, a: ghost * pulse * (mode === 'open' ? 1 : 0.45), w: 1.6, dash: [4, 5] });
     const s = P(target[0], 0, target[2]);
-    label(pen, s.x + 70, s.y + 70, { en: 'MOVE 37 · P10', zh: 'AlphaGo 的选择', a: ghost * 0.95, color: [150, 214, 255], rule: 110 });
+    if (mode === 'open') label(pen, s.x + 70, s.y + 70, { en: 'MOVE 37 · P10', zh: 'AlphaGo 的选择', a: ghost * 0.95, color: [150, 214, 255], rule: 110 });
   }
 
   // ---- hand
@@ -117,7 +117,11 @@ export function draw(pen, t, p, env) {
     const contact = at(0.012, 0.016, 0.012);
     const pts = [at(0.34, 0.2, 0.2), at(0.2, 0.12, 0.12), at(0.09, 0.07, 0.06), above, contact];
     let fingerTip;
-    if (t < tRetreat) fingerTip = path3(pts, ease.inOutCubic(tin));
+    if (mode === 'callback') {
+      // memory of the hand: it drifts in and hovers above the board, stone in its fingers
+      const k = ease.outCubic(clamp(t / 2.2));
+      fingerTip = at(0.12, 0.09, 0.08).lerp(above, k).add(new THREE.Vector3(0, 0.004 * Math.sin(t * 1.7), 0));
+    } else if (t < tRetreat) fingerTip = path3(pts, ease.inOutCubic(tin));
     else fingerTip = contact.clone().lerp(at(0.3, 0.17, 0.2), ease.inOutCubic(tout));
     // wrist sits back along the approach direction
     const dir = right.clone().multiplyScalar(-0.62).add(back.clone().multiplyScalar(-0.42)).add(V(0, -0.66, 0)).normalize();
@@ -125,7 +129,7 @@ export function draw(pen, t, p, env) {
     const relax = smoothstep(tPlace + 0.05, tPlace + 0.5, t);
     setPose(hand, mixPose(POSE.pinch, POSE.relaxed, relax));
     orient(hand, wrist, dir, V(0, -1, 0).add(right.clone().multiplyScalar(-0.25)));
-    handA = smoothstep(tHandIn - 0.2, tHandIn + 0.6, t) * (1 - smoothstep(tRetreat + 0.8, tRetreat + 1.6, t) * (p.handStays ? 0 : 1));
+    handA = mode === 'callback' ? smoothstep(0.0, 1.0, t) : smoothstep(tHandIn - 0.2, tHandIn + 0.6, t) * (1 - smoothstep(tRetreat + 0.8, tRetreat + 1.6, t) * (p.handStays ? 0 : 1));
     // soft shadow of the hand on the board
     const sh = P(fingerTip.x + 0.03, 0, fingerTip.z - 0.02);
     const shA = handA * clamp(1 - (fingerTip.y - 0.01) / 0.18) * 0.55;

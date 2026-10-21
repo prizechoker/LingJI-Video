@@ -88,8 +88,8 @@ export function stoneAt(pen, P, i, j, color, o = {}) {
   const ex = P(x + r, 0.004 + lift, z), ez = P(x, 0.004 + lift, z + r);
   const rx = Math.hypot(ex.x - c.x, ex.y - c.y);
   const ry = Math.hypot(ez.x - c.x, ez.y - c.y);
-  const blur = o.focusZ ? clamp(Math.abs(c.z - o.focusZ) * (o.dof ?? 40), 0, 9) : 0;
-  drawStone(pen, c.x, c.y, rx, color, { squash: clamp(ry / rx, 0.2, 1), a: (o.a ?? 1) * (1 - blur / 30), shadow: o.shadow ?? 0.6, glow: o.glow ?? 0, blur });
+  const blur = o.focusZ ? clamp(Math.abs(c.z - o.focusZ) * (o.dof ?? 40), 0, 7) : 0;
+  drawStone(pen, c.x, c.y, rx, color, { squash: clamp(ry / rx, 0.2, 1), a: (o.a ?? 1) * (1 - blur / 16), shadow: o.shadow ?? 0.6, glow: o.glow ?? 0, blur });
 }
 
 export function stoneAtWorld(pen, P, x, y, z, color, o = {}) {

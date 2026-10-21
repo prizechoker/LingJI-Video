@@ -1,7 +1,7 @@
 // Industrial arms built from primitives: a modern 6-axis arm and the 1961 Unimate.
 import { THREE, edges } from '../../core/three.js';
 
-function mesh(geo, mat, edgeOp = 0.22) {
+function mesh(geo, mat, edgeOp = 0.75) {
   const m = new THREE.Mesh(geo, mat);
   if (edgeOp > 0) edges(m, 0x9fd6ff, edgeOp, 30);
   return m;

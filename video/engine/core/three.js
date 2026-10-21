@@ -101,6 +101,7 @@ export function render3(pen, scene, camera, { glow = 0.5, a = 1 } = {}) {
 
 // Generic rim-lit material for props: dark body, coloured fresnel edge.
 export function propMaterial({ base = 0x0a0f16, rim = 0x7cc8ff, rimPower = 2.2, rimStrength = 2.0, emissive = 0x000000, opacity = 1 } = {}) {
+  // flat faces get uniform fresnel, so keep the body dark and let edge lines carry the form
   const m = new THREE.MeshStandardMaterial({ color: base, roughness: 0.55, metalness: 0.1, emissive, transparent: opacity < 1, opacity });
   const u = { rimColor: { value: new THREE.Color(rim) }, rimPower: { value: rimPower }, rimStrength: { value: rimStrength } };
   m.userData.u = u;

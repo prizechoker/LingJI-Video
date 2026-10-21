@@ -68,11 +68,19 @@ export function gripper(mat) {
 
 // Screen-space bounding box of an object (for perception reticles)
 export function screenBox(obj, P) {
-  const box = new THREE.Box3().setFromObject(obj);
+  // project (a subsample of) the real vertices, so the box hugs the visible silhouette
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
-    const s = P(x, y, z);
-    x0 = Math.min(x0, s.x); y0 = Math.min(y0, s.y); x1 = Math.max(x1, s.x); y1 = Math.max(y1, s.y);
-  }
+  const v = new THREE.Vector3();
+  obj.updateMatrixWorld(true);
+  obj.traverse((o) => {
+    if (!o.isMesh) return;
+    const pos = o.geometry.attributes.position;
+    const step = Math.max(1, Math.floor(pos.count / 400));
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      const s = P(v.x, v.y, v.z);
+      x0 = Math.min(x0, s.x); y0 = Math.min(y0, s.y); x1 = Math.max(x1, s.x); y1 = Math.max(y1, s.y);
+    }
+  });
   return { x0, y0, x1, y1 };
 }

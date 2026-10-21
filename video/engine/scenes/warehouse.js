@@ -22,11 +22,11 @@ function setup() {
   const k = new THREE.DirectionalLight(0xbfe0ff, 0.3);
   k.position.set(-2, 5, 3);
   scene.add(k);
-  const mat = propMaterial({ base: 0x070b10, rim: 0x86ccff, rimPower: 3.0, rimStrength: 1.7 });
+  const mat = propMaterial({ base: 0x020304, rim: 0x86ccff, rimPower: 3.0, rimStrength: 0.7 });
   const bots = ROUTES.map(() => {
     const g = new THREE.Group();
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.28, 0.6), mat);
-    edges(body, 0x9fd6ff, 0.3);
+    edges(body, 0x9fd6ff, 0.7);
     body.position.y = 0.16;
     g.add(body);
     const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.05, 28), mat);

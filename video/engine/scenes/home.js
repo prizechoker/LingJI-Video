@@ -88,8 +88,8 @@ export function draw(pen, t, p) {
   if (bA <= 0) return;
   const { cam, scene, items } = S;
   const lt = t - tBowls;
-  cam.position.set(lerp(0.15, -0.1, clamp(lt / 8)), 1.45, 1.75);
-  cam.lookAt(0, 0.62, 0);
+  cam.position.set(lerp(0.12, -0.08, clamp(lt / 8)), 1.32, 1.38);
+  cam.lookAt(0, 0.7, 0);
   cam.updateMatrixWorld();
   cam.updateProjectionMatrix();
   const P = projector(cam);
@@ -131,7 +131,7 @@ export function draw(pen, t, p) {
     const x = lerp(start.x, end.x, leapU);
     const y = lerp(start.y, end.y, leapU) - Math.sin(Math.PI * leapU) * 220;
     const sitMix = smoothstep(0.85, 1.0, leapU);
-    const sc = 0.8;
+    const sc = 1.15;
     if (sitMix < 1) polyline(pen, CAT_LEAP.map(([px, py]) => [x - px * sc, y + py * sc]), 1, { color: PAL.warmHi, a: cA * (1 - sitMix), w: 2.2, glow: 1 });
     if (sitMix > 0) polyline(pen, CAT_SIT.map(([px, py]) => [end.x - px * sc, end.y - 40 * sc + py * sc]), 1, { color: PAL.warmHi, a: cA * sitMix, w: 2.2, glow: 1 });
   }

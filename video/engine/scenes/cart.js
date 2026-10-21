@@ -42,6 +42,11 @@ function cartModel() {
   L.push([[0.38, 0.5, 0], [0.38, 0.95, 0]], [[0.38, 0.95, -0.32], [0.38, 0.95, 0.32]], [[-0.3, 0.5, 0.1], [-0.42, 1.25, 0.1]]);
   return L;
 }
+function camBox(u) {
+  // the TV camera that slides along the rail (u in 0..1)
+  const z = -0.32 + 0.64 * u;
+  return boxLines(0.2, 0.14, 0.12, 0.96).map((pl) => pl.map(([x, y, zz]) => [x + 0.44, y, zz + z]));
+}
 
 export function draw(pen, t, p) {
   if (!S) setup();
@@ -53,13 +58,13 @@ export function draw(pen, t, p) {
   const { cam } = S;
   // camera: high three-quarter view, slow push
   const k = ease.inOutSine(clamp(t / dur));
-  cam.position.set(lerp(-1.4, -0.6, k), lerp(7.4, 6.4, k), lerp(7.6, 6.4, k));
-  cam.lookAt(lerp(-0.4, 0.2, k), 0, lerp(0.2, 0, k));
+  cam.position.set(lerp(-2.6, -0.8, k), lerp(5.2, 6.6, k), lerp(5.4, 6.6, k));
+  cam.lookAt(lerp(-1.6, 0.2, k), 0, lerp(0.2, 0, k));
   cam.updateMatrixWorld();
   cam.updateProjectionMatrix();
   const P = projector(cam);
   const fog = [6, 14];
-  const reveal = prog(t, 0.0, 1.6, ease.outCubic);
+  const reveal = prog(t, -0.2, 0.9, ease.outCubic);
   // floor tiles + walls
   const tiles = [];
   for (let x = -4; x <= 4; x += 0.5) tiles.push([[x, 0, -2.2], [x, 0, 2.2]]);
@@ -69,7 +74,7 @@ export function draw(pen, t, p) {
   wire(pen, P, walls, { color: PAL.cool, a: 0.38, w: 1.3, glow: 0.35, reveal, fog });
   // chairs pop in
   CHAIRS.forEach(([x, z, ry], i) => {
-    const ca = smoothstep(0.5 + i * 0.12, 0.9 + i * 0.12, t);
+    const ca = smoothstep(0.1 + i * 0.06, 0.45 + i * 0.06, t);
     wire(pen, P, chairLines(), { color: PAL.cool, a: 0.55 * ca, w: 1.4, glow: 0.4, T: { pos: [x, 0, z], ry }, fog });
   });
   // goal marker
@@ -89,7 +94,9 @@ export function draw(pen, t, p) {
   const dist = Math.min(S.total, (hop + (t > tA ? moveF : 0)) * (S.total / hops));
   const pos = along(dist);
   const cart = cartModel();
-  wire(pen, P, cart, { color: PAL.cyan, a: 0.95, w: 1.7, glow: 0.9, T: { pos: [pos.x, 0, pos.z], ry: -pos.ang }, fog });
+  wire(pen, P, cart, { color: PAL.cyan, a: 0.85, w: 1.5, glow: 0.7, T: { pos: [pos.x, 0, pos.z], ry: -pos.ang }, fog });
+  const slideU = t > tA && f > 0.25 && f < 0.55 ? clamp((f - 0.25) / 0.3) : 0.5;
+  wire(pen, P, camBox(slideU), { color: PAL.warmHi, a: 0.95, w: 1.8, glow: 1.0, T: { pos: [pos.x, 0, pos.z], ry: -pos.ang } });
   // path planned (dashed ahead, solid behind)
   const pathPts = PATH.map(([x, z]) => [x, 0.02, z]);
   wire(pen, P, [pathPts], { color: PAL.cyan, a: 0.35 * smoothstep(1.4, 2.2, t), w: 1.4, glow: 0.4, dash: [8, 8] });

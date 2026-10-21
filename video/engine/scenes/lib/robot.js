@@ -2,7 +2,7 @@
 import { THREE, propMaterial, edges } from '../../core/three.js';
 
 let EDGE_COLOR = 0x9fd6ff;
-function part(geo, mat, edgeOp = 0.28) {
+function part(geo, mat, edgeOp = 0.42) {
   const m = new THREE.Mesh(geo, mat);
   if (edgeOp > 0) edges(m, EDGE_COLOR, edgeOp, 30);
   return m;
@@ -15,21 +15,38 @@ const rbox = (w, h, d, r = 0.02) => {
 
 export function createRobot(opts = {}) {
   EDGE_COLOR = opts.human ? 0xffc890 : 0x9fd6ff;
-  const mat = propMaterial({ base: opts.base ?? 0x070b10, rim: opts.rim ?? 0x86ccff, rimPower: 3.2, rimStrength: opts.rimStrength ?? 1.6 });
+  const mat = propMaterial({ base: opts.base ?? 0x05080c, rim: opts.rim ?? 0x86ccff, rimPower: opts.human ? 2.6 : 3.8, rimStrength: opts.rimStrength ?? 1.4 });
   const dark = propMaterial({ base: 0x020305, rim: opts.rim ?? 0x86ccff, rimPower: 4.0, rimStrength: 0.9 });
   const J = {};
   const root = new THREE.Group(); // at pelvis
   J.root = root;
-  const pelvis = part(rbox(0.32, 0.14, 0.2), mat);
+  const H = !!opts.human;
+  const eo = H ? 0 : 0.42; // humans: smooth silhouettes, no technical edges
+  const pelvis = H ? part(new THREE.SphereGeometry(0.16, 24, 16), mat, 0) : part(rbox(0.32, 0.14, 0.2), mat);
+  if (H) pelvis.scale.set(1.05, 0.62, 0.68);
   root.add(pelvis);
   // spine/torso
   const spine = new THREE.Group();
   spine.position.y = 0.06;
   root.add(spine);
   J.spine = spine;
-  const torso = part(rbox(0.4, 0.48, 0.24), mat);
-  torso.position.y = 0.25;
+  let torso;
+  if (H) {
+    // tapered torso: waist -> ribcage -> shoulders, flattened front-to-back
+    const prof = [[0.0, 0.0], [0.13, 0.0], [0.14, 0.08], [0.16, 0.2], [0.185, 0.33], [0.19, 0.42], [0.16, 0.48], [0.06, 0.52], [0.0, 0.52]];
+    torso = part(new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 40), mat, 0);
+    torso.scale.set(1.0, 1.0, 0.62);
+    torso.position.y = 0.0;
+  } else {
+    torso = part(rbox(0.4, 0.48, 0.24), mat);
+    torso.position.y = 0.25;
+  }
   spine.add(torso);
+  if (H) {
+    const nk = part(new THREE.CylinderGeometry(0.045, 0.05, 0.1, 20), mat, 0);
+    nk.position.y = 0.55;
+    spine.add(nk);
+  }
   if (!opts.human) {
     const chest = part(rbox(0.26, 0.16, 0.03), dark, 0.2);
     chest.position.set(0, 0.32, 0.105);
@@ -44,8 +61,8 @@ export function createRobot(opts = {}) {
   neck.position.y = 0.5;
   spine.add(neck);
   J.neck = neck;
-  const head = part(new THREE.SphereGeometry(0.105, 24, 18), mat, 0.0);
-  head.scale.set(1, 1.08, 1.05);
+  const head = part(new THREE.SphereGeometry(H ? 0.095 : 0.105, 28, 20), mat, 0.0);
+  head.scale.set(H ? 0.9 : 1, H ? 1.18 : 1.08, H ? 1.0 : 1.05);
   head.position.y = 0.12;
   neck.add(head);
   if (!opts.human) {
@@ -67,12 +84,12 @@ export function createRobot(opts = {}) {
     const s = side < 0 ? 'L' : 'R';
     // arm
     const sh = new THREE.Group();
-    sh.position.set(side * 0.25, 0.45, 0);
+    sh.position.set(side * (H ? 0.2 : 0.25), H ? 0.46 : 0.45, 0);
     spine.add(sh);
     J['shoulder' + s] = sh;
-    const shBall = part(new THREE.SphereGeometry(0.07, 16, 12), mat, 0);
+    const shBall = part(new THREE.SphereGeometry(H ? 0.06 : 0.07, 16, 12), mat, 0);
     sh.add(shBall);
-    sh.add(part(limb(0.29, 0.058), mat, 0.18));
+    sh.add(part(limb(0.29, H ? 0.046 : 0.058), mat, H ? 0 : 0.18));
     const el = new THREE.Group();
     el.position.y = -0.29;
     sh.add(el);
@@ -82,8 +99,8 @@ export function createRobot(opts = {}) {
       elDisc.rotation.z = Math.PI / 2;
       el.add(elDisc);
     }
-    el.add(part(limb(0.27, 0.05), mat, 0.18));
-    const hand = part(rbox(0.07, 0.11, 0.04), mat, 0.2);
+    el.add(part(limb(0.27, H ? 0.038 : 0.05), mat, H ? 0 : 0.18));
+    const hand = H ? part(new THREE.CapsuleGeometry(0.03, 0.06, 6, 12), mat, 0) : part(rbox(0.07, 0.11, 0.04), mat, 0.2);
     hand.position.y = -0.31;
     el.add(hand);
     J['hand' + s] = hand;
@@ -92,7 +109,7 @@ export function createRobot(opts = {}) {
     hip.position.set(side * 0.1, -0.04, 0);
     root.add(hip);
     J['hip' + s] = hip;
-    hip.add(part(limb(0.42, 0.08), mat, 0.18));
+    hip.add(part(limb(0.42, H ? 0.07 : 0.08), mat, H ? 0 : 0.18));
     const kn = new THREE.Group();
     kn.position.y = -0.42;
     hip.add(kn);
@@ -105,12 +122,13 @@ export function createRobot(opts = {}) {
       hipDisc.rotation.z = Math.PI / 2;
       hip.add(hipDisc);
     }
-    kn.add(part(limb(0.42, 0.065), mat, 0.18));
+    kn.add(part(limb(0.42, H ? 0.052 : 0.065), mat, H ? 0 : 0.18));
     const an = new THREE.Group();
     an.position.y = -0.42;
     kn.add(an);
     J['ankle' + s] = an;
-    const foot = part(rbox(0.11, 0.06, 0.24), mat, 0.2);
+    const foot = H ? part(new THREE.CapsuleGeometry(0.04, 0.16, 6, 12), mat, 0) : part(rbox(0.11, 0.06, 0.24), mat, 0.2);
+    if (H) foot.rotation.x = Math.PI / 2;
     foot.position.set(0, -0.03, 0.05);
     an.add(foot);
   }
@@ -184,11 +202,12 @@ export function poseFlip(R, u) {
 export function poseDance(R, ph) {
   poseStand(R, 0);
   const { J } = R;
-  J.shoulderL.rotation.z = -1.9 - 0.25 * Math.sin(ph);
-  J.shoulderR.rotation.z = 1.2 + 0.4 * Math.sin(ph + 1.2);
-  J.shoulderR.rotation.x = -0.6;
-  J.elbowL.rotation.x = -0.5;
-  J.elbowR.rotation.x = -0.9 + 0.3 * Math.sin(ph * 2);
+  J.shoulderL.rotation.z = -2.4 - 0.18 * Math.sin(ph);
+  J.shoulderL.rotation.x = -0.3;
+  J.elbowL.rotation.x = -0.35 - 0.25 * Math.sin(ph * 2);
+  J.shoulderR.rotation.z = 0.35 + 0.25 * Math.sin(ph + 1.2);
+  J.shoulderR.rotation.x = -0.45;
+  J.elbowR.rotation.x = -1.1 + 0.25 * Math.sin(ph * 2);
   J.spine.rotation.z = 0.08 * Math.sin(ph);
   J.hipL.rotation.x = -0.35 * Math.max(0, Math.sin(ph));
   J.kneeL.rotation.x = 0.6 * Math.max(0, Math.sin(ph));

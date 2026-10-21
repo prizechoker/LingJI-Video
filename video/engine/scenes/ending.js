@@ -19,7 +19,7 @@ function setup() {
   const human = createHand({ rimStrength: 2.2, rimPower: 2.6 });
   a.add(human.holder);
   const parts = [];
-  const pm = new THREE.MeshStandardMaterial({ color: 0x0b1118, emissive: 0x16304a, roughness: 0.5 });
+  const pm = new THREE.MeshStandardMaterial({ color: 0x0b1118, emissive: 0x3d8fd0, emissiveIntensity: 1.4, roughness: 0.5 });
   for (let i = 0; i < 6; i++) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, 0.03), pm);
     a.add(m);
@@ -81,8 +81,8 @@ export function draw(pen, t, p) {
     orient(S.human, tip.clone().sub(dir.clone().multiplyScalar(0.165)), dir, V(0, -1, 0));
     render3(pen, S.a, cam, { glow: 0.55, a: aA });
     const ta = smoothstep(0.3, 0.9, t) * aA;
-    text(pen.ui, '过去六十年', 960, 200, { size: 28, font: FONT.serif, weight: 500, color: [200, 206, 214], a: ta, spacing: 8 });
-    text(pen.ui, '人，迁就机器', 960, 262, { size: 56, font: FONT.serif, weight: 700, color: [150, 214, 255], a: ta, spacing: 12 });
+    text(pen.ui, '过去六十年', 640, 200, { size: 28, font: FONT.serif, weight: 500, color: [200, 206, 214], a: ta, spacing: 8 });
+    text(pen.ui, '人，迁就机器', 640, 262, { size: 56, font: FONT.serif, weight: 700, color: [150, 214, 255], a: ta, spacing: 12 });
   }
 
   // ===== B: the robot hand enters our world
@@ -108,8 +108,8 @@ export function draw(pen, t, p) {
     orient(S.robo, tip.clone().sub(dir.clone().multiplyScalar(0.165)), dir, V(0.2, -1, 0).normalize());
     render3(pen, S.b, cam, { glow: 0.55, a: bA });
     const ta = smoothstep(tNext + 0.2, tNext + 0.8, t) * bA;
-    text(pen.ui, '接下来', 960, 200, { size: 28, font: FONT.serif, weight: 500, color: [200, 206, 214], a: ta, spacing: 8 });
-    text(pen.ui, '机器，迁就人', 960, 262, { size: 56, font: FONT.serif, weight: 700, color: [255, 214, 160], a: ta, spacing: 12 });
+    text(pen.ui, '接下来', 640, 200, { size: 28, font: FONT.serif, weight: 500, color: [200, 206, 214], a: ta, spacing: 8 });
+    text(pen.ui, '机器，迁就人', 640, 262, { size: 56, font: FONT.serif, weight: 700, color: [255, 214, 160], a: ta, spacing: 12 });
   }
 
   // ===== end card

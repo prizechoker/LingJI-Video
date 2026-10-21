@@ -47,7 +47,7 @@ export function draw(pen, t, p) {
   const { cam, plates, scene, ghost, robot } = S;
 
   // --- the crossed-out "person" (before the box)
-  const gA = smoothstep(tPerson - 0.4, tPerson + 0.2, t) * (1 - smoothstep(tBox - 0.2, tBox + 0.4, t));
+  const gA = smoothstep(0.0, 0.5, t) * (1 - smoothstep(tBox - 0.2, tBox + 0.4, t));
   if (gA > 0.001) {
     poseStand(robot, t);
     robot.J.shoulderL.rotation.x = -0.9;
@@ -60,7 +60,7 @@ export function draw(pen, t, p) {
     cam.updateMatrixWorld();
     cam.updateProjectionMatrix();
     render3(pen, ghost, cam, { glow: 0.4, a: gA * 0.75 });
-    const strike = smoothstep(tPerson + 0.2, tPerson + 0.6, t);
+    const strike = smoothstep(tPerson + 0.5, tPerson + 0.9, t);
     if (strike > 0) line(pen, 760, 260, 760 + 420 * strike, 260 + 600 * strike, { color: PAL.gold, a: gA, w: 4, glow: 1 });
     text(pen.ui, '会洗碗的“人”', 1240, 520, { size: 40, font: FONT.serif, weight: 600, color: [214, 206, 194], a: gA, align: 'left', spacing: 3 });
     text(pen.ui, '没造', 1240, 580, { size: 22, font: FONT.sans, weight: 500, color: PAL.gold, a: gA * strike, align: 'left', spacing: 3 });
@@ -93,8 +93,8 @@ export function draw(pen, t, p) {
   });
   // door: hinged at the bottom front edge, swings up to close
   const close = ease.inOutCubic(clamp((t - tClose) / 0.6));
-  const ang = lerp(-Math.PI / 2 + 0.05, 0, close);
-  const hinge = (x, y) => [x, 0.0 + Math.cos(ang) * y, 0.3 + Math.sin(-ang) * y];
+  const ang = lerp(Math.PI / 2 - 0.08, 0, close); // 90deg = lying open towards the viewer, 0 = closed
+  const hinge = (x, y) => [x, Math.cos(ang) * y, 0.3 + Math.sin(ang) * y];
   const door = [[hinge(-0.3, 0), hinge(0.3, 0), hinge(0.3, 0.62), hinge(-0.3, 0.62), hinge(-0.3, 0)], [hinge(-0.2, 0.52), hinge(0.2, 0.52)]];
   wire(pen, P, door, { color: PAL.cool, a: 0.8 * bA, w: 1.8, glow: 0.7 });
   render3(pen, scene, cam, { glow: 0.5, a: bA * (1 - 0.65 * close) });

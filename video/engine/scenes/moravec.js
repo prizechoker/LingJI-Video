@@ -58,8 +58,8 @@ export function draw(pen, t, p) {
   pan(rx, ry, PAL.warm, ba);
   // left pan: chess + puzzle (light for computers)
   if (ea > 0) {
-    icon(pen, 'knight', lx - 50, ly + 105, 0.9, ea, PAL.cyan);
-    icon(pen, 'puzzle', lx + 55, ly + 112, 0.75, ea, PAL.cyan);
+    icon(pen, 'knight', lx - 60, ly + 100, 1.15, ea, PAL.cyan);
+    icon(pen, 'puzzle', lx + 62, ly + 108, 0.95, ea, PAL.cyan);
     text(pen.ui, '下棋 · 做智力题', lx, ly + 245, { size: 30, font: FONT.serif, weight: 600, color: [150, 214, 255], a: ea, spacing: 3 });
     text(pen.ui, '对电脑：并不难', lx, ly + 290, { size: 20, font: FONT.sans, weight: 400, color: PAL.dim, a: ea, spacing: 2 });
   }
@@ -67,7 +67,7 @@ export function draw(pen, t, p) {
   const items = [['eye', tLook, -80], ['feet', tWalk, 0], ['grab', tGrab, 80]];
   for (const [nm, tt, dx] of items) {
     const a = smoothstep(tt - 0.15, tt + 0.25, t);
-    if (a > 0) icon(pen, nm, rx + dx, ry + 108 - (1 - ease.outBack(clamp((t - tt + 0.15) / 0.5))) * 40, 0.75, a, PAL.warm);
+    if (a > 0) icon(pen, nm, rx + dx * 1.15, ry + 104 - (1 - ease.outBack(clamp((t - tt + 0.15) / 0.5))) * 40, 1.0, a, PAL.warm);
   }
   if (ha > 0) {
     text(pen.ui, '看 · 走 · 拿', rx, ry + 245, { size: 30, font: FONT.serif, weight: 600, color: [255, 205, 150], a: ha, spacing: 6 });

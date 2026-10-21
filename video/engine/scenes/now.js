@@ -39,7 +39,7 @@ function setup() {
   add('soup', makeVessel('soupBowl', warm), [0.0, 0.0, 0.0], [0.0, 0, 0.06]);
   add('rice', makeVessel('riceBowl', warm), [0.012, 0.02, 0.006], [0.18, 0, -0.22]);
   add('deep', makeVessel('deepBowl', warm), [0.15, 0.0, 0.07], [0, 0, 0]);
-  add('mug', makeVessel('mug', warm), [-0.13, 0.04, 0.09], [0.0, 0.6, 1.57]);
+  add('mug', makeVessel('mug', warm), [-0.14, 0.0, 0.08], [0.12, 2.2, 0.08]);
   add('sticks', chopsticks(warm), [0.03, 0.075, 0.02], [0.0, 0.7, 0.15]);
   const cool = coolMat();
   const g = gripper(cool);
@@ -59,7 +59,7 @@ export function draw(pen, t, p, env) {
   if (t < tSink + 0.3) {
     const aA = 1 - smoothstep(tSink - 0.1, tSink + 0.3, t);
     // year ticker
-    const yrA = smoothstep(0, 0.4, t) * (1 - smoothstep(tFlip + 0.2, tFlip + 0.8, t));
+    const yrA = smoothstep(0, 0.35, t) * (1 - smoothstep(tFlip - 0.45, tFlip - 0.05, t));
     if (yrA > 0) {
       const u = prog(t, 0.15, Math.max(0.6, tFlip - 0.2), ease.inOutCubic);
       const yr = Math.round(lerp(2016, 2026, u));
@@ -67,7 +67,7 @@ export function draw(pen, t, p, env) {
       text(pen.ui, 'TEN YEARS LATER · 十年后', 960, 630, { size: 18, font: FONT.mono, weight: 500, color: PAL.dim, a: yrA * aA, spacing: 6 });
     }
     // robot
-    const rA = smoothstep(tFlip - 0.4, tFlip + 0.1, t) * aA;
+    const rA = smoothstep(tFlip - 0.25, tFlip + 0.15, t) * aA;
     if (rA > 0.001) {
       const { robot, cam, scene } = S;
       let x = 0;

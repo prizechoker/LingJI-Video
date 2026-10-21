@@ -3,3 +3,7 @@ video/out/
 video/cache/
 *.m4s
 video/audio/takes/
+video/audio/*.wav
+!video/audio/voice_ref.wav
+video/audio/*.json
+__pycache__/

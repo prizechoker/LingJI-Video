@@ -61,11 +61,10 @@ export function draw(pen, t, p) {
   const pos = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
   TILES.forEach((T, i) => {
     const a = smoothstep(0.1 + i * 0.18, 0.5 + i * 0.18, t);
-    const spread = lerp(250, 0, merge);
-    const s = lerp(300, 520, merge);
-    const x = 960 + pos[i][0] * spread * 0.95 + (merge > 0 ? 0 : 0), y = 470 + pos[i][1] * spread * 0.62;
+    const s = lerp(250, 520, merge);
+    const x = 960 + pos[i][0] * lerp(170, 0, merge), y = 470 + pos[i][1] * lerp(165, 0, merge);
     tile(pen, T.key, x, y, s, a * lerp(1, 0.5, merge));
-    if (merge < 0.5) text(pen.ui, T.zh, x, y + s / 2 + 26, { size: 20, font: FONT.sans, weight: 500, color: PAL.dim, a: a * (1 - merge * 2), spacing: 4 });
+    if (merge < 0.5) text(pen.ui, T.zh, x + pos[i][0] * (s / 2 + 52), y + 6, { size: 20, font: FONT.sans, weight: 500, color: PAL.dim, a: a * (1 - merge * 2), spacing: 4 });
   });
   // the shared board after the merge
   if (merge > 0.6) {

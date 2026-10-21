@@ -11,7 +11,7 @@ let S = null;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 function setup() {
-  const cool = propMaterial({ base: 0x070b10, rim: 0x86ccff, rimPower: 3.0, rimStrength: 1.7 });
+  const cool = propMaterial({ base: 0x020304, rim: 0x86ccff, rimPower: 3.0, rimStrength: 0.55 });
   const dark = propMaterial({ base: 0x030507, rim: 0x86ccff, rimPower: 4.0, rimStrength: 0.8 });
   const warm = propMaterial({ base: 0x2a1404, rim: 0xffb36b, rimPower: 1.6, rimStrength: 2.6, emissive: 0x6a2a00 });
   // line of welders
@@ -150,7 +150,7 @@ export function draw(pen, t, p) {
     else if (ph < 0.65) part.position.copy(tipW).add(V(0, -0.02, 0));
     else part.position.set(1.95, 0.58 + 0.0, 0.62);
     part.rotation.y = u.J.yaw.rotation.y;
-    render3(pen, S.cell, cam, { glow: 0.55, a: bA * (1 - up * 0.6) });
+    render3(pen, S.cell, cam, { glow: 0.55, a: bA * (1 - up * 0.85) });
     const sp = P(spot.x, spot.y, spot.z);
     // ghosts of previous parts at the identical spot + coordinate readout
     const sameA = smoothstep(tSame + 0.8, tSame + 1.4, t) * (1 - up);
@@ -190,7 +190,13 @@ export function draw(pen, t, p) {
         const q = P(x0 + i * step, 0.002, z0 + j * step);
         lightDot(pen, q.x, q.y, 9, PAL.cyan, 0.7 * ba);
       }
-      text(pen.ui, '一张棋盘', 960, 540, { size: 96, font: FONT.serif, weight: 800, color: [246, 240, 230], a: ba * 0.95, spacing: 24 });
+      const ui = pen.ui;
+      const g = ui.createRadialGradient(960, 540, 0, 960, 540, 380);
+      g.addColorStop(0, `rgba(3,5,8,${0.75 * ba})`);
+      g.addColorStop(1, 'rgba(3,5,8,0)');
+      ui.fillStyle = g;
+      ui.fillRect(560, 300, 800, 480);
+      text(ui, '一张棋盘', 960, 540, { size: 96, font: FONT.serif, weight: 800, color: [246, 240, 230], a: ba * 0.95, spacing: 24 });
     }
   }
 }

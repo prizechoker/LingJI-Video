@@ -17,5 +17,6 @@ import * as teleop from './teleop.js';
 import * as hands from './hands.js';
 import * as ending from './ending.js';
 import * as posetest from './posetest.js';
+import * as cover from './cover.js';
 
-export const SCENES = { go, now, title, cart, moravec, factory, simple, warehouse, floor, dish, home, turn, design, gala, twoways, teleop, hands, ending, posetest };
+export const SCENES = { go, now, title, cart, moravec, factory, simple, warehouse, floor, dish, home, turn, design, gala, twoways, teleop, hands, ending, posetest, cover };
