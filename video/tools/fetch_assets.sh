@@ -41,5 +41,12 @@ for m in Concrete047A WoodFloor051 Carpet012; do
   for k in Color NormalGL Roughness; do cp "$tmp/$m/${m}_2K-JPG_$k.jpg" "assets/textures/${m}_$k.jpg"; done
   rm -rf "$tmp/$m" "$tmp/$m.zip"
 done
+# the home and the balance (shots/home.js, design.js, balance.js): antique brass, a knit sweater, plaster walls, a wool rug
+for m in Metal048C Fabric068 PaintedPlaster017 Carpet016; do
+  curl -fsSL -o "$tmp/$m.zip" "https://ambientcg.com/get?file=${m}_2K-JPG.zip"
+  unzip -q -o "$tmp/$m.zip" -d "$tmp/$m"
+  for k in Color NormalGL Roughness; do cp "$tmp/$m/${m}_2K-JPG_$k.jpg" "assets/textures/${m}_$k.jpg"; done
+  rm -rf "$tmp/$m" "$tmp/$m.zip"
+done
 rm -rf "$tmp"
 echo "assets ready"

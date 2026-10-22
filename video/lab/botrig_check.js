@@ -17,8 +17,35 @@ export async function setup({ scale, params }) {
     log(k, 'model ankles', a.toArray(), b.toArray(), 'stand-in minY', so.L.minY, so.R.minY);
   }
   for (const g of ['walk', 'run']) log(g, gait(g));
+  const P = (b) => rig.bones[b].getWorldPosition(new THREE.Vector3()).toArray();
+  for (const [k, p] of Object.entries({ bend: { armL: { shoulder: [0.5, 0.2, 0.15], elbow: 2.1 } }, fist: { armL: { shoulder: [0.9, 0.3, 0.15], elbow: 1.45, wrist: [0, 0.3, 0] } },
+    twist: { armL: { shoulder: [0.25, 0, 0.1], elbow: 1.57, wrist: [0, -1.4, 0] } },
+    hand: { armL: { shoulder: [0.5, 0, 0.1], elbow: 1.0, wrist: [0, -1.0, 0], fingers: 1, thumb: 1 } } })) {
+    rig.setPose(p);
+    log(k, 'elbow', P('forearm_L'), 'wrist', P('hand_L'), 'knuckle', P('middle1_L'), 'shoulder', P('upperarm_L'));
+  }
   rig.setPose({ armL: { shoulder: [2.7, 0.1, 0.35], elbow: 0.2 } });
   log('raise upperarm_L pos', rig.bones.upperarm_L.position.toArray(), 'rest', rig.bones.upperarm_L.userData.restP.toArray(), 'clav q', rig.bones.clavicle_L.quaternion.toArray());
+  // foot slip: with the holder moving at the gait's speed, how far does each planted pivot move during its stance?
+  for (const g of ['walk', 'run']) {
+    const info = gait(g), f = g === 'walk' ? walkPose : runPose;
+    let worst = 0, worstY = 0;
+    const prev = {};
+    for (let i = 0; i <= 400; i++) {
+      const ph = i / 400, p = f(ph), so = soles(p);
+      const hz = info.stride * ph; // the holder's advance
+      for (const sd of ['L', 'R']) {
+        const q = so[sd];
+        const down = q.minY + p.root.pos[1] < 0.003; // (soles() measures with the root offset included)
+        const k = q.w.indexOf(Math.max(...q.w));
+        const z = q.piv[k][2] + hz;
+        if (down && prev[sd] && prev[sd].k === k) worst = Math.max(worst, Math.abs(z - prev[sd].z));
+        prev[sd] = down ? { k, z } : null;
+        if (down) worstY = Math.min(worstY, q.minY);
+      }
+    }
+    log(g, 'max slip per 1/400 cycle (m)', worst, 'deepest sole (m)', worstY, 'speed', info.speed);
+  }
   for (let i = 0; i < 24; i++) {
     const ph = i / 24, p = walkPose(ph);
     p.root.pos = [0, 0, 0];

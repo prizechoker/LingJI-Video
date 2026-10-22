@@ -2,7 +2,7 @@
 // stairs with a handrail, a wok on a gas hob with its spatula. Each set is built around its own origin; units: metres.
 import { THREE } from '../../engine2/core.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { door, bookRow, bake } from './home_room.js';
+import { door, bookRow, bake, framedPicture } from './home_room.js';
 import { rng } from './kit.js';
 
 const mesh = (geo, mat, cast = true) => {
@@ -159,13 +159,13 @@ export function stairSet(M, st) {
   rs.bezierCurveTo(-0.03, 0.03, -0.036, 0.0, -0.028, -0.022);
   const rail = new THREE.ExtrudeGeometry(rs, { depth: strLen + 0.05, bevelEnabled: false, curveSegments: 16 });
   rail.translate(0, 0, -strLen - 0.05);
-  const railMesh = mesh(rail, oak);
+  const railM = new THREE.MeshStandardMaterial({ map: oak.map, normalMap: oak.normalMap, color: 0xc89a6c, roughness: 0.62 });
+  const railMesh = mesh(rail, railM);
   railMesh.position.set(0, railH + 0.03, 0.06 - 0.05);
   railMesh.rotation.x = pitch;
   g.add(railMesh);
   // the wall side: plaster, a skirting stringer, a framed print
-  const smooth = M.wall.clone();
-  smooth.normalScale = new THREE.Vector2(0.12, 0.12);
+  const smooth = new THREE.MeshStandardMaterial({ color: 0xefe4d2, roughness: 0.9 });
   const wall = mesh(new THREE.PlaneGeometry(6, 5), smooth, false);
   wall.rotation.y = Math.PI / 2;
   wall.position.set(-W - 0.01, 1.8, -2);
@@ -184,6 +184,24 @@ export function stairSet(M, st) {
   const back = mesh(new THREE.PlaneGeometry(4, 5), M.wall, false);
   back.position.set(-0.5, 2.5, -n * go - 0.6);
   g.add(back);
+  // family pictures climbing the wall, a warm sconce on the landing
+  [[0, 21, ['#e8dccb', '#c46a3c', '#2f4a5a', '#e8b05a']], [1, 22, ['#efe6d6', '#6b8a9a', '#d9a066', '#3b4a3a']], [2, 23, ['#e3d8c4', '#a85a44', '#d8c08a', '#556270']]].forEach(([k, seed, pal]) => {
+    const f = framedPicture(M, { w: 0.3, h: 0.38, seed, palette: pal, mat: 0.04 });
+    f.rotation.y = Math.PI / 2;
+    f.position.set(-W - 0.005, 1.55 + k * 0.5, -0.55 - k * 0.95);
+    g.add(f);
+  });
+  const sconce = new THREE.Group();
+  const shadeM = new THREE.MeshStandardMaterial({ color: 0xf6e6c8, emissive: 0xffb466, emissiveIntensity: 1.6, roughness: 0.8, side: THREE.DoubleSide });
+  const shade = mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.16, 32, 1, true), shadeM, false);
+  sconce.add(shade);
+  const arm = mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.14, 8), M.brass);
+  arm.rotation.x = Math.PI / 2;
+  arm.position.z = -0.08;
+  sconce.add(arm);
+  sconce.position.set(-0.45, n * rise + 0.95, -n * go - 0.6 + 0.15);
+  g.add(sconce);
+  g.userData.sconce = sconce.position.clone();
   g.userData.railAt = (k) => new THREE.Vector3(0, railH + 0.06 + k * rise, -k * go + 0.06 - 0.02);
   g.userData.stepAt = (k) => new THREE.Vector3(-W / 2, (k + 1) * rise, -k * go - go / 2);
   return g;
@@ -248,8 +266,8 @@ export function stoveSet(M, st) {
     g.add(gr);
     for (let k = 0; k < 5; k++) {
       const a = (k / 5) * Math.PI * 2 + 0.3;
-      const f = mesh(box(0.07, 0.03, 0.012, 0.003), iron);
-      f.position.set(bx + Math.cos(a) * 0.09, top + 0.045, bz + Math.sin(a) * 0.09);
+      const f = mesh(box(0.05, 0.03, 0.012, 0.003), iron);
+      f.position.set(bx + Math.cos(a) * 0.1, top + 0.047, bz + Math.sin(a) * 0.1);
       f.rotation.y = -a;
       g.add(f);
     }
@@ -263,7 +281,7 @@ export function stoveSet(M, st) {
     g.add(k);
   }
   // the wok: carbon steel, seasoned dark with a blued, oily sheen; a long handle with a wooden grip and a loop
-  const wokM = new THREE.MeshPhysicalMaterial({ color: 0x242020, metalness: 0.75, roughness: 0.38, clearcoat: 0.5, clearcoatRoughness: 0.25, iridescence: 0.25, iridescenceIOR: 1.6 });
+  const wokM = new THREE.MeshPhysicalMaterial({ color: 0x262222, metalness: 0.75, roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.3, iridescence: 0.25, iridescenceIOR: 1.6 });
   const R0 = 0.17, D = 0.095;
   const wp = [];
   for (let i = 0; i <= 24; i++) { const a = (i / 24) * (Math.PI / 2) * 0.92; wp.push([R0 * Math.sin(a) / Math.sin(Math.PI / 2 * 0.92), D * (1 - Math.cos(a)) / (1 - Math.cos(Math.PI / 2 * 0.92))]); }

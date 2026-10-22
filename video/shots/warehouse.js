@@ -35,7 +35,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     texture: 'Concrete047A', tile: 6, tint: 0x8a939c, cell: [C, C], origin: [0, 0], lineW: 0.025, paint: 0xaab4bd, paintA: 0.5, wear: 0.2,
     texMix: 0.45, texMean: 0xa4a197, blotch: 0.3, roughness: 0.5, clearcoat: 0, normalScale: 0.4,
     pools: { pitch: [6 * C, 2.5 * C], offset: [0, 0], radius: [2.2, 2.8], color: 0xdfeaff, intensity: p.pools ?? 1.25, rect: [-20, -20, 20, 20] },
-    refl: { intensity: p.refl ?? 1.4, height: 12, pitch: [6 * C, 2.5 * C], offset: [0, 0], half: [0.05, 1.1], blur: 0.02 },
+    refl: { intensity: p.refl ?? 0.7, height: 12, pitch: [6 * C, 2.5 * C], offset: [0, 0], half: [0.05, 1.1], blur: 0.02 },
   });
   const floor = new THREE.Mesh(floorPlane(90, 90, 0, -10), fl);
   floor.receiveShadow = true;

@@ -16,7 +16,7 @@
 import { Studio, THREE, spot } from '../engine2/core.js';
 import { BOARD } from '../engine2/goban.js';
 import { buildGoSet, position } from './lib/goset.js';
-import { buildFactory, G } from './lib/grid_factory.js';
+import { buildFactory, G, ROWS } from './lib/grid_factory.js';
 import { flangeSet } from './lib/grid_parts.js';
 import { ss, sstep, clamp, lerp, breathe, grade, V3 } from './lib/kit.js';
 
@@ -48,7 +48,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
   st.camera.userData.pxH = st.h;
   st.camera.rotation.order = 'YXZ';
   await st.hdri('../assets/hdri/empty_warehouse_01_2k.hdr', { intensity: p.env ?? 0.25, rotation: 0.4 });
-  const fogCol = new THREE.Color(p.fogCol ?? 0x1a232d);
+  const fogCol = new THREE.Color(p.fogCol ?? (mode === 'cold' ? 0x15202c : 0x1a232d));
   st.scene.background = fogCol.clone();
   st.scene.fog = new THREE.FogExp2(fogCol, p.fog ?? (mode === 'board' ? 0.012 : 0.024));
 
@@ -61,11 +61,12 @@ export async function create({ renderer, scale, p, dur, cues }) {
     hazeI: p.haze ?? (mode === 'board' ? 0 : 0.01),
     fixtures: mode === 'match',
     jRange: p.jRange || [-7, 2],
+    rows: ROWS.slice(1, 7),
   });
   st.scene.add(fac.group);
 
   // light: a cold key from high above (the roof lights as one soft source) + pools under every fixture on the floor
-  const sun = new THREE.DirectionalLight(0xe6efff, p.key ?? 0.45);
+  const sun = new THREE.DirectionalLight(mode === 'cold' ? 0xd4e3ff : 0xe6efff, p.key ?? 0.45);
   sun.position.set(4, 30, 7);
   sun.target.position.set(0, 0, -6);
   sun.castShadow = true;

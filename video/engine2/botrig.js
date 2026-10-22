@@ -501,10 +501,11 @@ const RUN_KEYS = { // degrees over the leg's cycle (0 = contact; toe-off at 0.34
 };
 
 const RUN_OFF = 0.34; // toe-off
+const RUN_LEAN = 0.13; // the pelvis pitched forward (the body leans from the ankles)
 
 function runAngles(phase) {
   const leg = (p) => ({
-    hip: [cyc(RUN_KEYS.hip, p) * DEG, 0.26, -0.11 + 0.03 * C(p - 0.2)],
+    hip: [cyc(RUN_KEYS.hip, p) * DEG + RUN_LEAN - 0.08, 0.26, -0.11 + 0.03 * C(p - 0.2)], // (the keys are for a pelvis pitched 0.08)
     knee: cyc(RUN_KEYS.knee, p) * DEG,
     ankle: [cyc(RUN_KEYS.ankle, p) * DEG, 0, 0.03],
     toe: Math.max(0, cyc(RUN_KEYS.toe, p)) * DEG,
@@ -514,11 +515,11 @@ function runAngles(phase) {
     return { shoulder: [-0.66 + 1.12 * fwd, 0.16 + 0.14 * fwd, 0.3 - 0.2 * fwd], elbow: 1.42 + 0.14 * fwd, wrist: [0.12, 0.25, 0.05], fingers: 0.62, thumb: 0.55, spread: -0.2 };
   };
   return {
-    root: { pos: [0, 0, 0], rot: [0.08, -0.11 * C(phase), -0.06 * S(phase)] },
-    spine: [0.03, 0.07 * C(phase), 0.03 * S(phase)],
-    chest: [0.03, 0.1 * C(phase), 0.02 * S(phase)],
-    neck: [-0.08, -0.06 * C(phase), 0],
-    head: [-0.06, -0.05 * C(phase), 0],
+    root: { pos: [0, 0, 0], rot: [RUN_LEAN, -0.11 * C(phase), -0.06 * S(phase)] },
+    spine: [0.05, 0.07 * C(phase), 0.03 * S(phase)],
+    chest: [0.04, 0.1 * C(phase), 0.02 * S(phase)],
+    neck: [-0.11, -0.06 * C(phase), 0],
+    head: [-0.1, -0.05 * C(phase), 0],
     legL: leg(phase), legR: leg(phase + 0.5),
     armL: arm(phase + 0.5), armR: arm(phase),
   };

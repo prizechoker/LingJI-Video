@@ -217,7 +217,7 @@ export async function buildFactory(st, {
   }
   const postM = inst(postGeometry(), fenceMat, posts.length);
   posts.forEach(([x, z], i) => place(postM, i, x, 0, z));
-  const frameM = inst(panelFrameGeometry(), fenceMat, panels.length);
+  const frameM = inst(panelFrameGeometry(), fenceMat, panels.length, false);
   const meshM = inst(panelMeshGeometry(), meshMat, panels.length, false);
   panels.forEach(([x, z, yaw, L], i) => { place(frameM, i, x, 0, z, yaw, [L - 0.06, 1, 1]); place(meshM, i, x, 0, z, yaw, [L - 0.06, 1, 1]); });
 
@@ -326,7 +326,7 @@ export async function buildFactory(st, {
       const welding = tipList.filter((x) => x.w > 0.01);
       welding.sort((A, B) => fleet.tips[A.i].distanceToSquared(f) - fleet.tips[B.i].distanceToSquared(f));
       const coreList = welding.map(({ i, w }) => ({ p: fleet.tips[i], k: w * arcFlicker(t, i) * arcGain, size: 1 }));
-      cores.userData.set(coreList);
+      cores.userData.set(coreList, camera);
       glow.set(coreList.map((c) => ({ p: c.p.clone().add(new THREE.Vector3(0, 0.08, 0)), k: c.k })));
       const emitters = [];
       for (const { i } of tipList.slice().sort((A, B) => fleet.tips[A.i].distanceToSquared(f) - fleet.tips[B.i].distanceToSquared(f)).slice(0, maxSparkArms)) {

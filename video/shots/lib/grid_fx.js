@@ -141,16 +141,22 @@ export function arcCores(n, { radius = 0.012 } = {}) {
   mesh.frustumCulled = false;
   mesh.count = 0;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3();
-  mesh.userData.set = (list) => {
-    // list: [{ p, k (0..), size }]
+  const cp = new THREE.Vector3();
+  mesh.userData.set = (list, camera = null) => {
+    // list: [{ p, k (0..), size }]; with a camera, far arcs keep a minimum size on screen (they read as points)
+    let pxA = 0;
+    if (camera) { camera.getWorldPosition(cp); pxA = (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / (camera.userData.pxH || 540); }
     let i = 0;
     for (const a of list) {
       if (a.k <= 0.01) continue;
-      s.setScalar(radius * (a.size ?? 1) * (0.7 + 0.3 * a.k));
+      let r = radius * (a.size ?? 1) * (0.7 + 0.3 * a.k), gain = 1;
+      if (pxA) { const rMin = a.p.distanceTo(cp) * pxA * 1.2; if (rMin > r) { gain = (r / rMin) ** 2; r = rMin; } }
+      s.setScalar(r);
       m4.compose(a.p, q, s);
       mesh.setMatrixAt(i, m4);
       const c = a.color || [0.75, 0.88, 1.0];
-      mesh.instanceColor.setXYZ(i, c[0] * a.k * 40, c[1] * a.k * 40, c[2] * a.k * 40);
+      const e = a.k * 40 * Math.max(gain, 0.12);
+      mesh.instanceColor.setXYZ(i, c[0] * e, c[1] * e, c[2] * e);
       i++;
     }
     mesh.count = i;

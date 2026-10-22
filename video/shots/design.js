@@ -49,12 +49,15 @@ export async function create({ renderer, scale, p, dur, cues }) {
   st.scene.updateMatrixWorld(true);
   const handle = doorG.localToWorld(doorG.userData.handle.clone());
   const lever = doorG.localToWorld(doorG.userData.handle.clone().add(V3(-0.075, -0.004, 0.05)));
-  const rail = stairG.localToWorld(stairG.userData.railAt(2.2));
+  const rail = stairG.localToWorld(stairG.userData.railAt(1.6));
   const step = stairG.localToWorld(stairG.userData.stepAt(3));
   const blade = stoveG.localToWorld(stoveG.userData.blade.clone());
 
   // lights for the close-ups: the corner lamp's shadowed spot is borrowed as each set's key; a soft fill; a cool rim
   // from the hall for the robot
+  const sconceL = new THREE.PointLight(0xffb468, 0, 0, 2);
+  sconceL.position.copy(stairG.localToWorld(stairG.userData.sconce.clone()));
+  st.scene.add(sconceL);
   const fill = new THREE.SpotLight(0xffe2c0, 0, 0, 0.6, 1, 2);
   const rim = new THREE.SpotLight(0xbcd2ff, 0, 0, 0.35, 0.9, 2);
   st.scene.add(fill, fill.target, rim, rim.target);
@@ -103,6 +106,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     update(t) {
       const seg = segAt(t);
       const b = breathe(t, 0.0012, 5);
+      sconceL.intensity = 0;
       if (seg === 'door') {
         room(false);
         // a warm lamp down the hall rakes across the door from the left
@@ -117,10 +121,11 @@ export async function create({ renderer, scale, p, dur, cues }) {
       } else if (seg === 'stairs') {
         room(false);
         // light from a window on the landing above, falling down the steps through the balusters
-        setKey(SET.stairs.clone().add(V3(-0.2, 4.2, -3.6)), SET.stairs.clone().add(V3(-0.3, 0.6, -0.4)), 22, 0.55);
+        setKey(SET.stairs.clone().add(V3(-0.75, 4.0, -3.4)), SET.stairs.clone().add(V3(-0.4, 0.5, -0.2)), 30, 0.6);
         fill.position.copy(SET.stairs.clone().add(V3(1.8, 1.4, 2.2)));
         fill.target.position.copy(step);
-        fill.intensity = 2.0;
+        fill.intensity = 4.0;
+        sconceL.intensity = 3.5;
         rim.intensity = 0;
         const u = (t - tStairs) / Math.max(0.5, tPan - tStairs);
         const pos = SET.stairs.clone().add(V3(-0.12 - 0.03 * u, 0.5 + 0.03 * u, 1.05 - 0.1 * u)).add(V3(...b));
@@ -128,7 +133,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
       } else if (seg === 'stove') {
         room(false);
         // the range hood's lamp straight above, and the room's warm spill
-        setKey(SET.stove.clone().add(V3(-0.05, 1.7, -0.32)), SET.stove.clone().add(V3(-0.15, 0.9, -0.22)), 13, 0.7);
+        setKey(SET.stove.clone().add(V3(-0.05, 1.7, -0.32)), SET.stove.clone().add(V3(-0.15, 0.9, -0.22)), 10, 0.7);
         fill.position.copy(SET.stove.clone().add(V3(1.2, 1.5, 1.4)));
         fill.target.position.copy(blade);
         fill.intensity = 1.0;
@@ -154,7 +159,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
       const seg = segAt(t);
       const lab = (pt, text, t0, side, dx, dy) => callout(g, cam, pt, { text, a: sstep(t0, t0 + 0.3, t), side, dx, dy, size: 34, color: [246, 226, 196], line: [236, 206, 160] });
       if (seg === 'door') lab(lever, '门把手', tDoor, 1, 150, -160);
-      if (seg === 'stairs') lab(rail, '楼梯', tStairs + 0.12, -1, 140, -120);
+      if (seg === 'stairs') lab(rail, '楼梯', tStairs + 0.12, 1, 300, 90);
       if (seg === 'stove') lab(blade, '锅铲', tPan + 0.12, 1, 160, -150);
     },
   };

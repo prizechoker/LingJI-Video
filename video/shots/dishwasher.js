@@ -92,10 +92,10 @@ export async function create({ renderer, scale, p, dur, cues }) {
 
   // ---------------------------------------------------------------- water
   const slow = p.slow ?? 0.1;
-  // aerated jet water: clear but scattering a little light, so the threads read against the dark tub
+  // jet water: clear (it shows the dishes behind it, bent, with dark rims and sharp highlights)
   const jetMat = new THREE.MeshPhysicalMaterial({
-    color: 0xeef5ff, roughness: 0.08, metalness: 0, transmission: p.trans ?? 0.6, thickness: 0.003, ior: 1.33, specularIntensity: 1,
-    attenuationColor: new THREE.Color(0xdde9f2), attenuationDistance: 0.02,
+    color: 0xffffff, roughness: 0.0, metalness: 0, transmission: p.trans ?? 1, thickness: 0.004, ior: 1.33, specularIntensity: 1,
+    attenuationColor: new THREE.Color(0xd6e4ee), attenuationDistance: 0.05,
   });
   const spray = sprayField({ slow, mat: jetMat });
   // the water keeps its own reflections when the kitchen light falls away
@@ -104,10 +104,10 @@ export async function create({ renderer, scale, p, dur, cues }) {
   st.scene.add(spray.mesh);
   const lowerNoz = [];
   for (const [r, hit] of [[0.05, 0.12], [0.09, 0.16], [0.13, 0.1], [0.17, 0.14], [0.205, 0.09], [-0.05, 0.13], [-0.09, 0.11], [-0.13, 0.17], [-0.17, 0.1]]) {
-    lowerNoz.push({ r, speed: 2.6 + Math.abs(r) * 2, tan: r > 0 ? 0.22 : -0.22, out: Math.sign(r) * 0.06, hit, rate: 800, size: 0.0032 });
+    lowerNoz.push({ r, speed: 2.6 + Math.abs(r) * 2, tan: r > 0 ? 0.22 : -0.22, out: Math.sign(r) * 0.06, hit, rate: 800, size: 0.0026 });
   }
   const midNoz = [];
-  for (const [r, hit] of [[0.05, 0.07], [0.09, 0.09], [0.13, 0.06], [0.17, 0.08], [-0.05, 0.08], [-0.09, 0.06], [-0.13, 0.09]]) midNoz.push({ r, speed: 2.0, tan: r > 0 ? 0.25 : -0.25, out: 0, hit, rate: 500, size: 0.0026 });
+  for (const [r, hit] of [[0.05, 0.07], [0.09, 0.09], [0.13, 0.06], [0.17, 0.08], [-0.05, 0.08], [-0.09, 0.06], [-0.13, 0.09]]) midNoz.push({ r, speed: 2.0, tan: r > 0 ? 0.25 : -0.25, out: 0, hit, rate: 500, size: 0.0021 });
   const hubL = new THREE.Vector3(), hubM = new THREE.Vector3();
 
   // the front cut: a clipping plane that sweeps down through the door and the shell
