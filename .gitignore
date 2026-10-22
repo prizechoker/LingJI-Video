@@ -7,3 +7,10 @@ video/audio/*.wav
 !video/audio/voice_ref.wav
 video/audio/*.json
 __pycache__/
+# downloaded CC0 assets (re-fetch with video/tools/fetch_assets.sh)
+video/assets/hdri/
+video/assets/textures/
+video/assets/mh/base.obj
+video/assets/mh/default.mhskel
+video/lab/bench.html
+video/lab/bench.mjs

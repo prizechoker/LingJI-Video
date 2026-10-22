@@ -1,0 +1,7 @@
+{ "imports": {
+  "three": "../node_modules/three/build/three.module.js",
+  "three/addons/": "../node_modules/three/examples/jsm/",
+  "three/examples/jsm/": "../node_modules/three/examples/jsm/",
+  "postprocessing": "../node_modules/postprocessing/build/index.js",
+  "n8ao": "../node_modules/n8ao/dist/N8AO.js"
+} }

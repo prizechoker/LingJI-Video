@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>lab</title>
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">
+{ "imports": {
+  "three": "../node_modules/three/build/three.module.js",
+  "three/addons/": "../node_modules/three/examples/jsm/",
+  "three/examples/jsm/": "../node_modules/three/examples/jsm/",
+  "postprocessing": "../node_modules/postprocessing/build/index.js",
+  "n8ao": "../node_modules/n8ao/dist/N8AO.js"
+} }
+</script>
+</head><body>
+<script type="module">
+const q = new URLSearchParams(location.search);
+const mod = await import(`./${q.get('scene')}.js`);
+const scale = parseFloat(q.get('scale') || '1');
+try {
+  const api = await mod.setup({ scale, params: JSON.parse(q.get('p') || '{}') });
+  document.body.appendChild(api.canvas);
+  window.__frame = (t) => { api.frame(t); return true; };
+  window.__ready = true;
+} catch (e) { window.__error = String(e && e.stack || e); }
+</script></body></html>
