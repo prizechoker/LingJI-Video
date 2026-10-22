@@ -660,6 +660,8 @@ for sd, s in SIDES.items():
                               [f"lowerarm02.{sd}"] + [f"finger{f}-1.{sd}" for f in range(1, 6)], (Wr, JB[f"f31_{sd}"]), 0.05,
                               palm_planes, voxel=0.0016, smooth=6), wr)
     palm["pad_dir"] = tuple(pal)
+    palm["pad_axis"] = (*Wr, *JB[f"f31_{sd}"])
+    palm["pad_off"] = 0.002
     for f in range(1, 6):
         par = wr
         for k in range(1, 4):
@@ -681,6 +683,8 @@ for sd, s in SIDES.items():
                 near += [f"metacarpal{i}.{sd}" for i in range(1, 5)] + [f"wrist.{sd}"]
             seg = reparent(body_part(f"W_f{f}{k}_{sd}", [f"finger{f}-{k}.{sd}"], near, (a, b), 0.014 if f > 1 else 0.018, pl, voxel=0.0009, smooth=6), j)
             seg["pad_dir"] = tuple(pad)
+            seg["pad_axis"] = (*a, *b)
+            seg["pad_off"] = 0.0003
             if k > 1 or f > 1:  # knuckle: a small graphite hinge across the joint
                 width = 0.017 if f > 1 else 0.019
                 reparent(finish(cyl(f"G_knuckle{f}{k}_{sd}", 0.0052 if f > 1 else 0.006, width * 0.82, a, fx, segs=32), sub=1, bevel=0.0012), j)
@@ -723,11 +727,19 @@ for sd, s in SIDES.items():
 bpy.context.view_layer.update()
 for ob in SC.objects:
     if ob.type == "MESH" and "pad_dir" in ob:
+        # the pad is the palm-side half of the part: signed distance from its mid-plane along the pad direction
         pd = Vector(ob["pad_dir"])
+        ax = ob["pad_axis"]
+        a, b = Vector(ax[:3]), Vector(ax[3:])
+        off = ob["pad_off"]
         col = ob.data.color_attributes.new(name="Col", type="FLOAT_COLOR", domain="POINT")
-        mw3 = ob.matrix_world.to_3x3()
+        mw = ob.matrix_world
         for v in ob.data.vertices:
-            m = max(0.0, min(1.0, ((mw3 @ v.normal).normalized().dot(pd) - 0.2) / 0.35))
+            p = mw @ v.co
+            ab = b - a
+            t = max(0.0, min(1.0, (p - a).dot(ab) / ab.length_squared))
+            d = (p - (a + ab * t)).dot(pd) - off
+            m = max(0.0, min(1.0, d / 0.0016 + 0.5))
             col.data[v.index].color = (m * m * (3 - 2 * m), 0.0, 0.0, 1.0)
         ob.data.color_attributes.active_color = col
 

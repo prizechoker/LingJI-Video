@@ -25,6 +25,7 @@ export function bowlGeometry() {
   uv.needsUpdate = true;
   let top = 0;
   pts.forEach((p, i) => { if (p.y > pts[top].y) top = i; });
+  g.userData.inner = pts.slice(top);  // lip -> inside centre
   g.userData.rimV = L[top] / L[n - 1];
   g.userData.rimY = pts[top].y;
   g.userData.rimR = pts[top].x;
@@ -72,8 +73,8 @@ export function buildBowl(mat = porcelainMaterial()) {
 
 export function waterMaterial() {
   return new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, roughness: 0.02, metalness: 0, transmission: 1, thickness: 0.003, ior: 1.33, specularIntensity: 1,
-    envMapIntensity: 1.4, transparent: false,
+    color: 0xffffff, roughness: 0.0, metalness: 0, transmission: 1, thickness: 0.004, ior: 1.33, specularIntensity: 1,
+    envMapIntensity: 2.4, attenuationColor: new THREE.Color(0xc9d6dc), attenuationDistance: 0.03, transparent: false,
   });
 }
 
@@ -98,4 +99,94 @@ export function surfaceDroplets(bowl, { n = 60, seed = 4, rmin = 0.0008, rmax = 
     g.add(d);
   }
   return g;
+}
+
+// the water left in a (tilted) bowl: a level surface clipped by the bowl's inside, filled to `belowLip` under the
+// lowest point of the lip, so it is just spilling there. World space; call after the bowl's matrices are updated.
+export function waterInBowl(bowl, { belowLip = 0.0015, segs = 96, mat = waterMaterial() } = {}) {
+  const inner = bowl.geometry.userData.inner;
+  const m = bowl.matrixWorld;
+  const at = (i, th) => new THREE.Vector3(inner[i].x * Math.cos(th), inner[i].y, inner[i].x * Math.sin(th)).applyMatrix4(m);
+  let low = null;
+  for (let k = 0; k < segs; k++) {
+    const p = at(0, (k / segs) * Math.PI * 2);
+    if (!low || p.y < low.y) low = p;
+  }
+  const level = low.y - belowLip;
+  const ring = [];
+  for (let k = 0; k < segs; k++) {
+    const th = (k / segs) * Math.PI * 2;
+    let prev = at(inner.length - 1, th);
+    let hit = null;
+    for (let i = inner.length - 2; i >= 0; i--) {  // climb the inside wall until it rises above the level
+      const p = at(i, th);
+      if (prev.y <= level && p.y > level) { hit = prev.clone().lerp(p, (level - prev.y) / (p.y - prev.y)); break; }
+      prev = p;
+    }
+    if (hit) ring.push(hit);
+  }
+  const c = ring.reduce((a, p) => a.add(p), new THREE.Vector3()).multiplyScalar(1 / ring.length);
+  const pos = [c.x, c.y, c.z];
+  for (const p of ring) pos.push(p.x, p.y, p.z);
+  const idx = [];
+  for (let k = 0; k < ring.length; k++) idx.push(0, 1 + ((k + 1) % ring.length), 1 + k);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  const surf = new THREE.Mesh(g, mat);
+  surf.userData.spillPoint = low;
+  return surf;
+}
+
+// a tongue of water leaving a point with velocity `v` (m/s), falling for `T` seconds: a flattened, tapering
+// stream that breaks into drops at its tip
+export function spillStream(start, v, { T = 0.06, width = 0.009, thick = 0.0028, mat = waterMaterial(), seed = 3, drops = 26 } = {}) {
+  const grp = new THREE.Group();
+  const gvec = new THREE.Vector3(0, -9.81, 0);
+  const pts = [];
+  for (let i = 0; i <= 16; i++) {
+    const t = (i / 16) * T;
+    pts.push(start.clone().addScaledVector(v, t).addScaledVector(gvec, 0.5 * t * t));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const tube = new THREE.TubeGeometry(curve, 64, 1, 20, false);
+  // reshape the unit tube: wide and thin (a sheet), tapering toward the tip
+  const pos = tube.attributes.position, frames = curve.computeFrenetFrames(64, false);
+  const P = new THREE.Vector3(), C = new THREE.Vector3(), d = new THREE.Vector3();
+  for (let i = 0; i <= 64; i++) {
+    const u = i / 64;
+    curve.getPointAt(u, C);
+    const side = new THREE.Vector3().crossVectors(curve.getTangentAt(u), new THREE.Vector3(0, 1, 0)).normalize();
+    const up = new THREE.Vector3().crossVectors(side, curve.getTangentAt(u)).normalize();
+    const taper = Math.pow(1 - u, 0.6) * (1 + 0.15 * Math.sin(u * 23));
+    for (let j = 0; j <= 20; j++) {
+      const k = i * 21 + j;
+      P.fromBufferAttribute(pos, k);
+      d.copy(P).sub(frames.tangents[i] ? C : C);
+      const a = (j / 20) * Math.PI * 2;
+      const q = C.clone().addScaledVector(side, Math.cos(a) * width * 0.5 * taper).addScaledVector(up, Math.sin(a) * thick * 0.5 * (0.6 + 0.4 * taper));
+      pos.setXYZ(k, q.x, q.y, q.z);
+    }
+  }
+  tube.computeVertexNormals();
+  grp.add(new THREE.Mesh(tube, mat));
+  let s = seed;
+  const R = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const sph = new THREE.SphereGeometry(1, 16, 12);
+  const tip = pts[pts.length - 1];
+  for (let k = 0; k < drops; k++) {
+    const t = T * (0.75 + R() * 0.7);
+    const vv = v.clone().add(new THREE.Vector3((R() - 0.5) * 0.25, (R() - 0.5) * 0.25, (R() - 0.5) * 0.25));
+    const p = start.clone().addScaledVector(vv, t).addScaledVector(gvec, 0.5 * t * t);
+    const r = 0.0006 + R() ** 2.2 * 0.0022;
+    const m = new THREE.Mesh(sph, mat);
+    m.position.copy(p);
+    const dir = vv.clone().addScaledVector(gvec, t).normalize();
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    m.scale.set(r, r, r * (1 + R() * 1.2));
+    grp.add(m);
+  }
+  grp.userData.tip = tip;
+  return grp;
 }

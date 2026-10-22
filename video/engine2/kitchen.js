@@ -30,10 +30,10 @@ export function buildKitchen(studio, { width = 3.2 } = {}) {
   slab(sx0, sx1, sz1, 0);
   // undermount basin: a rounded box seen from inside
   const steel = steelMaterial();
-  const basin = new THREE.Mesh(new RoundedBoxGeometry(sink.w - 0.004, sink.depth * 2, sink.d - 0.004, 6, 0.03), steel);
+  const basin = new THREE.Mesh(new RoundedBoxGeometry(sink.w - 0.004, sink.depth, sink.d - 0.004, 6, 0.03), steel);
   basin.material = steel.clone();
-  basin.material.side = THREE.BackSide;
-  basin.position.set(0, top - t, sink.z);
+  basin.material.side = THREE.BackSide;  // seen from inside; its lid faces up and is culled
+  basin.position.set(0, top - t - sink.depth / 2, sink.z);
   basin.receiveShadow = true;
   g.add(basin);
   // drain
