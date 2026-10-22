@@ -30,8 +30,9 @@ def shots(scene, mode=None):
 
 
 def cue(s, name, default=None):
+    """a shot's cue, in film seconds (timeline.json stores cues as absolute times)"""
     v = s["cues"].get(name)
-    return s["start"] + v if v is not None else default
+    return v if v is not None else default
 
 
 # ------------------------------------------------------------------ writing helpers

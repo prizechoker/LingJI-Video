@@ -98,6 +98,18 @@ act = np.clip(speech / (np.percentile(speech[speech > 1e-4], 60) + 1e-9), 0, 1)
 duck_m = 10 ** (-9.0 * act / 20)
 duck_s = 10 ** (-3.0 * act / 20)
 
+# ---- music leveller: the score's soft passages sit ~20 dB under its swells, which under a voice and ducking falls
+# below hearing on a phone; lift them (slowly, up to 12 dB) toward the body of the score, leave silences silent
+k = 480
+mp = (music ** 2).mean(1)
+mp = mp[: len(mp) // k * k].reshape(-1, k).mean(1)
+win = int(2.0 * SR / k)
+env_db = 10 * np.log10(np.convolve(mp, np.ones(win) / win, mode="same") + 1e-12)
+lift = np.clip(-30.0 - env_db, 0, 12) * (env_db > -62)
+sm = int(1.5 * SR / k)
+lift = np.convolve(lift, np.ones(sm) / sm, mode="same")
+lift = np.pad(np.repeat(lift, k), (0, len(music) - len(lift) * k), mode="edge")
+music = music * (10 ** (lift / 20))[:, None]
 m_l = meter.integrated_loudness(music + 1e-9)
 music = music * 10 ** ((-19.0 - m_l) / 20)
 s_l = meter.integrated_loudness(sfx + 1e-9)
