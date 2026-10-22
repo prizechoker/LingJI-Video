@@ -61,3 +61,26 @@ export function wrap(h, f, { base = {}, thick = 0.0085, limit = 1.7, step = 0.02
   setPose(h, pose);
   return pose;
 }
+
+// curl joint by joint, root first, as a finger closes round an edge: each joint bends until the part of the finger
+// beyond it touches (fingerPoints order: [mid1, P2, mid2, P3, mid3, tip, pad] -> beyond MCP 0.., PIP 2.., DIP 4..)
+export function wrapSeq(h, f, { base = {}, thick = 0.008, limits = [1.4, 1.8, 1.2], step = 0.02, only = FINGERS.slice(1) } = {}) {
+  const pose = JSON.parse(JSON.stringify(base));
+  pose.spread = pose.spread || {};
+  for (const name of only) {
+    const n = FINGERS.indexOf(name) + 1;
+    pose[name] = (base[name] || [0, 0, 0]).slice();
+    [0, 2, 4].forEach((from, j) => {
+      const v0 = pose[name][j];
+      for (let c = step; c <= limits[j]; c += step) {
+        pose[name][j] = v0 + c;
+        setPose(h, pose);
+        h.holder.updateMatrixWorld(true);
+        const pts = fingerPoints(h, n).slice(from);
+        if (Math.min(...pts.map(f)) < thick) { pose[name][j] = v0 + c - step; break; }
+      }
+    });
+  }
+  setPose(h, pose);
+  return pose;
+}

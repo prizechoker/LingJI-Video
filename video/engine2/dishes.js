@@ -26,6 +26,7 @@ export function bowlGeometry() {
   let top = 0;
   pts.forEach((p, i) => { if (p.y > pts[top].y) top = i; });
   g.userData.inner = pts.slice(top);  // lip -> inside centre
+  g.userData.profile = pts;           // the whole section: underside centre -> outside -> lip -> inside centre
   g.userData.rimV = L[top] / L[n - 1];
   g.userData.rimY = pts[top].y;
   g.userData.rimR = pts[top].x;

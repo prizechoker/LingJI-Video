@@ -6,9 +6,9 @@ import { Studio, THREE, spot } from '../engine2/core.js';
 import { loadHand, setPose, mixPose } from '../engine2/hand.js';
 import { buildSleeve } from '../engine2/sleeve.js';
 import { buildKitchen, COUNTER } from '../engine2/kitchen.js';
-import { buildBowl, porcelainMaterial, surfaceDroplets, waterMaterial } from '../engine2/dishes.js';
-import { wrap, sdf } from './lib/grasp.js';
-import { rimGrip } from './lib/pinch.js';
+import { buildBowl, porcelainMaterial, surfaceDroplets, waterMaterial, waterInBowl } from '../engine2/dishes.js';
+import { wrap, wrapSeq, sdf } from './lib/grasp.js';
+import { solvePinch, padPoint } from '../engine2/bothand.js';
 import { ss, sstep, clamp, lerp, breathe, grade, V3, rng } from './lib/kit.js';
 
 const G = new THREE.Vector3(0, -9.81, 0);
@@ -31,18 +31,19 @@ function hamper(st) {
 
 export async function create({ renderer, scale, p, cues, dur }) {
   const st = new Studio({ scale, renderer });
-  await st.hdri('../assets/hdri/blinds_2k.hdr', { intensity: p.env ?? 0.4, rotation: p.rot ?? 2.1, background: { blur: 0.09, intensity: p.bg ?? 0.45 } });
+  const wash = p.mode === 'wash';
+  await st.hdri('../assets/hdri/blinds_2k.hdr', { intensity: p.env ?? (wash ? 0.25 : 0.4), rotation: p.rot ?? (wash ? 0.9 : 2.1), background: { blur: 0.09, intensity: p.bg ?? 0.45 } });
   const kitchen = buildKitchen(st, { width: 2.4 });
   kitchen.position.x = -0.55;
   st.scene.add(kitchen);
   const top = COUNTER.top;
   const mode = p.mode || 'catch';
-  hamper(st);
+  const lights = hamper(st);
   st.camera.near = 0.02;
-  grade(st, { ao: { radius: 0.02, intensity: 1.6, falloff: 0.5 }, dof: { distance: 0.4, range: p.range ?? 0.1, bokeh: 3.5 }, bloom: { intensity: 0.35, threshold: 0.9 }, vignette: 0.62, contrast: 0.09, saturation: -0.08, exposure: p.exposure ?? 1.0 });
+  grade(st, { ao: { radius: 0.02, intensity: 1.6, falloff: 0.5 }, dof: { distance: 0.4, range: p.range ?? 0.1, bokeh: 3.5 }, bloom: { intensity: 0.35, threshold: 0.9 }, vignette: 0.62, contrast: 0.09, saturation: p.sat ?? (mode === 'wash' ? -0.16 : -0.08), exposure: p.exposure ?? 1.0 });
 
   if (mode === 'catch') return catchShot(st, { p, cues, dur, top });
-  if (mode === 'wash') return washShot(st, { p, cues, dur, top, kitchen });
+  if (mode === 'wash') return washShot(st, { p, cues, dur, top, kitchen, lights });
   return capShot(st, { p, cues, dur, top });
 }
 
@@ -79,20 +80,28 @@ async function catchShot(st, { p, cues, dur, top }) {
   h.holder.quaternion.identity();
   h.holder.updateMatrixWorld(true);
   const palmLocal = h.bones.f3_1.getWorldPosition(V3()).multiplyScalar(0.55).add(V3(0, -0.012, 0));
-  // forearm from the person in front (+z), a little up and to the right; palm turned up under the falling mug
-  const Zm = V3(0.18, 0.3, 1).normalize();
+  // forearm from the person standing to the right (+x), palm up, fingers across the falling mug's body so they can
+  // close round it (the mug's axis lies in the y-z plane as it tips over the edge)
+  const Zm = V3(...(p.fore ?? [1, 0.3, 0.12])).normalize();
   const up = V3(0, 1, 0);
   const Ym = up.clone().addScaledVector(Zm, -up.dot(Zm)).normalize().negate();
   const Xm = V3().crossVectors(Ym, Zm);
   const qHand = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(Xm, Ym, Zm));
   const comC = COM.clone().applyMatrix4(Mc);
-  const palmTarget = comC.clone().add(V3(0.0, -(R + 0.016), 0.012));
+  const axis = V3(0, 1, 0).applyQuaternion(atC.q);
+  const mugSdf = sdf.cylinder(V3(0, 0, 0).applyMatrix4(Mc), axis, R, H);
+  // the palm meets the mug's underside: drop straight down from its centre until clear of the surface
+  let d = 0;
+  while (d < 0.15 && mugSdf(comC.clone().add(V3(0, -d, 0))) < 0.002) d += 0.001;
+  const palmTarget = comC.clone().add(V3(p.palmX ?? -0.006, -d, 0));
   const posC = palmTarget.clone().sub(palmLocal.clone().applyQuaternion(qHand));
   h.holder.quaternion.copy(qHand);
   h.holder.position.copy(posC);
   h.holder.updateMatrixWorld(true);
-  const axis = V3(0, 1, 0).applyQuaternion(atC.q);
-  const closed = wrap(h, sdf.cylinder(V3(0, 0, 0).applyMatrix4(Mc), axis, R, H), { base: OPEN, thick: 0.0085 });
+  // fingers close joint by joint round the body, the thumb over the top
+  const closed = wrapSeq(h, mugSdf, { base: OPEN, thick: 0.0085 });
+  setPose(h, closed);
+  Object.assign(closed, wrap(h, mugSdf, { base: closed, thick: 0.0085, only: ['thumb'] }));
   // the mug's place relative to the hand after the catch
   const rel = new THREE.Matrix4().copy(h.holder.matrixWorld).invert().multiply(Mc);
   const vC = v0.clone().addScaledVector(G, UC);
@@ -107,9 +116,9 @@ async function catchShot(st, { p, cues, dur, top }) {
       // the hand: sweeping in along a curve that matches the mug's fall at the catch, then braking
       let hp, close;
       if (u < UC) {
-        const k = clamp(1 - (UC - u) / 0.22);
+        const k = clamp(1 - (UC - u) / 0.16); // a reflex: the hand only starts once the mug is going
         const e = 1 - (1 - k) ** 2;
-        hp = posC.clone().add(V3(0.04, -0.06, 0.26).multiplyScalar(1 - e)).addScaledVector(vC, -(UC - u) * 0.5 * (1 - e) * 0);
+        hp = posC.clone().add(V3(0.36, -0.12, 0.05).multiplyScalar(1 - e));
         close = sstep(UC - 0.03, UC, u);
       } else {
         const v = u - UC, T = 0.085;
@@ -130,11 +139,12 @@ async function catchShot(st, { p, cues, dur, top }) {
         mug.position.copy(tmpP);
         mug.quaternion.copy(tmpQ);
       }
-      // camera: low, beside the counter's edge, on the falling mug
+      // camera: low in front of the counter's edge, the mug tipping toward it, the hand coming in from the right
       const k = ss(clamp(t / dur));
-      const look = V3(0.04, top - 0.1 - 0.04 * sstep(tC - 0.2, tC + 0.8, t), 0.09);
+      const cl = p.look ?? [0.05, -0.045, 0.1], cp = p.cam ?? [-0.16, -0.035, 0.55];
+      const look = V3(cl[0], top + cl[1] - 0.085 * sstep(tC - 1.0, tC + 0.3, t), cl[2]);
       const b = breathe(t, 0.0012, 2);
-      st.camera.position.set(-0.52 + 0.05 * k + b[0], top - 0.05 + b[1], 0.3 - 0.04 * k + b[2]);
+      st.camera.position.set(cp[0] + 0.03 * k + b[0], top + cp[1] + b[1], cp[2] - 0.05 * k + b[2]);
       st.camera.lookAt(look);
       if (st.camera.fov !== 30) { st.camera.fov = 30; st.camera.updateProjectionMatrix(); }
       if (st.dof) st.dof.target = mug.position.clone().add(V3(0, 0.04, 0));
@@ -143,127 +153,199 @@ async function catchShot(st, { p, cues, dur, top }) {
 }
 
 // ---------------------------------------------------------------- wash
-async function washShot(st, { p, cues, dur, top, kitchen }) {
+// distance from a point to a polyline in the (r, y) half-plane of a lathe section
+function sectionSdf(pts, inv) {
+  return (pw) => {
+    const q = pw.clone().applyMatrix4(inv);
+    const r = Math.hypot(q.x, q.z), y = q.y;
+    let m = Infinity;
+    for (let i = 1; i < pts.length; i++) {
+      const ax = pts[i - 1].x, ay = pts[i - 1].y, bx = pts[i].x - ax, by = pts[i].y - ay;
+      const k = Math.max(0, Math.min(1, ((r - ax) * bx + (y - ay) * by) / (bx * bx + by * by || 1)));
+      m = Math.min(m, Math.hypot(r - ax - k * bx, y - ay - k * by));
+    }
+    return m;
+  };
+}
+
+// the rice bowl cradled in the palm (foot in the palm, fingers up its far wall, thumb along the near one), tipped
+// toward the camera under the running tap: the stream lands inside, pools, and the bowl turns slowly in it
+async function washShot(st, { p, dur, top, kitchen, lights }) {
   const water = waterMaterial();
+  // a cooler, plainer daylight than the other two: water and white porcelain over steel
+  lights.key.color.set(0xfff2e6);
+  lights.fill.color.set(0xe4ecf6);
+  // brushed steel picks up the warm room and reads pink here: cool it a touch and soften the reflection
+  kitchen.traverse((o) => {
+    if (o.isMesh && o.material && o.material.metalness === 1) {
+      o.material = o.material.clone();
+      o.material.color.set(p.steel ?? 0xa1b4c0);
+      o.material.roughness = Math.max(o.material.roughness, 0.36);
+    }
+  });
   const spout = kitchen.userData.spout.clone().add(kitchen.position);
-  const base = V3(spout.x + 0.012, top - 0.075, spout.z + 0.018); // the foot, down in the sink under the tap
-  const camPos = V3(spout.x - 0.3, top + 0.2, spout.z + 0.42);
-  const grip = await rimGrip(st, { base, camPos, human: true, want: V3(0.25, -0.45, -0.85), gap: 0.0045 });
-  const { h, pose, rimLocal, quat, gripOffset } = grip;
-  h.holder.add(buildSleeve(st, { suit: 0x6b5a4a }));
-  st.scene.add(h.holder);
-  setPose(h, pose);
+  const rig = new THREE.Group();
+  st.scene.add(rig);
   const bowl = buildBowl(porcelainMaterial());
-  st.scene.add(bowl);
-  bowl.updateMatrixWorld(true);
-  bowl.add(surfaceDroplets(bowl, { n: 80, mat: water }));
-  const grip0 = base.clone().add(rimLocal);
-  // the tap running
+  rig.add(bowl);
+  bowl.add(surfaceDroplets(bowl, { n: 70, mat: water }));
+  const h = await loadHand(st);
+  h.holder.add(buildSleeve(st, { suit: 0x6b5a4a, dir: V3(...(p.sleeve ?? [0, 0.3, 1])) }));
+  rig.add(h.holder);
+  // hand in bowl space: palm up (palm normal is the holder's -y), fingers toward -z, forearm toward +z (the person)
+  const yaw = p.yaw ?? 0;
+  h.holder.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(V3(-1, 0, 0), V3(0, -1, 0), V3(0, 0, 1)))
+    .premultiply(new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), yaw))
+    .multiply(new THREE.Quaternion().setFromAxisAngle(V3(1, 0, 0), p.pitch ?? -0.12));
+  const CRADLE = { index: [0.25, 0.15, 0.1], middle: [0.25, 0.15, 0.1], ring: [0.28, 0.15, 0.1], little: [0.3, 0.15, 0.1], thumb: [-0.4, 0.1, 0], spread: { index: 0.06, middle: 0, ring: -0.06, little: -0.14 }, thumbRoll: 0, ...(p.cradle || {}) };
+  setPose(h, CRADLE);
+  h.holder.position.set(0, 0, 0);
+  rig.updateMatrixWorld(true);
+  const palmLocal = h.bones.f3_1.getWorldPosition(V3()).multiplyScalar(0.55);
+  const palmDown = V3(0, 0.012, 0).applyQuaternion(h.holder.quaternion); // palm surface: 12 mm off the bones, palm side
+  const seat = V3(...(p.seat ?? [0, -0.002, 0.008]));
+  h.holder.position.copy(seat).sub(palmLocal).add(palmDown);
+  rig.updateMatrixWorld(true);
+  const inv = bowl.matrixWorld.clone().invert();
+  const grip = wrap(h, sectionSdf(bowl.geometry.userData.profile, inv), { base: CRADLE, thick: p.thick ?? 0.0085, limit: 1.9 });
+  setPose(h, grip);
+
+  // the rig in the sink: tipped toward the camera, the rim's centre under the spout
+  const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(...(p.tilt ?? [0.32, 0, -0.18]), 'YXZ'));
+  const camPos = V3(...(p.cam ?? [spout.x + 0.16, top + 0.035, spout.z + 0.32]));
+  const aimAt = V3(spout.x + (p.aim?.[0] ?? 0.0), top - 0.06 + (p.aim?.[1] ?? 0), spout.z + (p.aim?.[2] ?? 0.02));
+  const inside = V3(0, 0.03, 0); // where the stream should land, bowl space
   const bottom = top - COUNTER.t - COUNTER.sink.depth;
-  const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0052, spout.y - bottom, 24, 1, true), water);
-  stream.position.set(spout.x, (spout.y + bottom) / 2, spout.z);
+  const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0046, 1, 24, 1, true), water);
   st.scene.add(stream);
   const R = rng(5);
-  const splash = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 8), water, 70);
+  const splash = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 8), water, 60);
   splash.frustumCulled = false;
   st.scene.add(splash);
-  const drops = Array.from({ length: 70 }, () => ({ ph: R(), a: R() * Math.PI * 2, sp: 0.2 + R() * 0.5, up: 0.4 + R() * 0.6, r: 0.0006 + R() ** 2 * 0.0016 }));
-  const qr = new THREE.Quaternion(), m4 = new THREE.Matrix4(), sc = V3();
+  const drops = Array.from({ length: 60 }, () => ({ ph: R(), a: R() * Math.PI * 2, sp: 0.15 + R() * 0.45, up: 0.3 + R() * 0.5, r: 0.0005 + R() ** 2 * 0.0014 }));
+  // the pooled water by reflection alone: a transmissive surface here refracts the hand under the bowl and goes pink
+  const poolMat = new THREE.MeshPhysicalMaterial({ color: 0xdde8f0, transparent: true, opacity: 0.26, roughness: 0.03, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.1, depthWrite: false });
+  let pool = null;
+  const ray = new THREE.Raycaster();
+  const m4 = new THREE.Matrix4(), sc = V3(), qI = new THREE.Quaternion();
   return {
     studio: st,
     update(t) {
-      // a slow turn of the bowl in the stream, the wrist rolling
-      const ang = 0.5 * Math.sin(t * 0.9) + 0.25 * t / dur;
-      qr.setFromAxisAngle(V3(0, 1, 0), 0.25 * Math.sin(t * 0.9)).multiply(new THREE.Quaternion().setFromAxisAngle(V3(1, 0, 0), 0.12 * Math.sin(t * 0.7 + 1)));
-      const gp = grip0.clone().add(V3(0.006 * Math.sin(t * 1.3), 0.004 * Math.sin(t * 0.9), 0));
-      h.holder.quaternion.copy(qr).multiply(quat);
-      h.holder.position.copy(gp).sub(gripOffset.clone().applyQuaternion(qr));
-      bowl.quaternion.copy(qr);
-      bowl.position.copy(gp).sub(rimLocal.clone().applyQuaternion(qr));
-      // splashes off the bowl where the stream lands (looping, deterministic)
-      const hit = V3(spout.x, bowl.position.y + 0.03, spout.z);
+      // the slow rinse: the bowl turns in the stream and rocks a little on the wrist
+      const turn = new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), (p.turn ?? 0.35) * Math.sin(t * 1.1 - 0.4))
+        .multiply(new THREE.Quaternion().setFromAxisAngle(V3(1, 0, 0), 0.05 * Math.sin(t * 0.8 + 1)));
+      rig.quaternion.copy(turn).multiply(tilt);
+      // place the rig so the landing point sits under the spout
+      rig.position.set(0, 0, 0);
+      rig.updateMatrixWorld(true);
+      const land = inside.clone().applyMatrix4(bowl.matrixWorld);
+      rig.position.set(spout.x + (p.off?.[0] ?? 0), top - (p.depth ?? 0.045), spout.z + (p.off?.[2] ?? 0)).sub(land);
+      rig.updateMatrixWorld(true);
+      land.copy(inside).applyMatrix4(bowl.matrixWorld);
+      // the stream: from the spout straight down to whatever it meets in the bowl
+      ray.set(spout, V3(0, -1, 0));
+      ray.far = 1;
+      const hit = ray.intersectObject(bowl, false)[0];
+      const endY = hit ? hit.point.y : bottom;
+      stream.scale.set(1, spout.y - endY, 1);
+      stream.position.set(spout.x, (spout.y + endY) / 2, spout.z);
+      // the water pooled in the bowl, level, rebuilt as the bowl turns
+      if (pool) { st.scene.remove(pool); pool.geometry.dispose(); }
+      pool = waterInBowl(bowl, { belowLip: p.fill ?? 0.015, mat: poolMat });
+      st.scene.add(pool);
+      // splashes where the stream lands (looping, deterministic)
+      const at = V3(spout.x, Math.max(endY, pool.geometry.attributes.position.getY(0)), spout.z);
       drops.forEach((d, i) => {
-        const u = ((t * 1.7 + d.ph) % 1) * 0.12;
+        const u = ((t * 1.9 + d.ph) % 1) * 0.1;
         const v = V3(Math.cos(d.a) * d.sp, d.up, Math.sin(d.a) * d.sp);
-        const pos = hit.clone().addScaledVector(v, u).addScaledVector(G, 0.5 * u * u);
-        m4.compose(pos, qr.clone().identity(), sc.setScalar(d.r));
+        const pos = at.clone().addScaledVector(v, u).addScaledVector(G, 0.5 * u * u);
+        m4.compose(pos, qI, sc.setScalar(d.r * (1 - u / 0.1)));
         splash.setMatrixAt(i, m4);
       });
       splash.instanceMatrix.needsUpdate = true;
       const k = ss(clamp(t / dur));
       const b = breathe(t, 0.0012, 5);
-      st.camera.position.set(camPos.x + 0.05 * k + b[0], camPos.y + b[1], camPos.z - 0.06 * k + b[2]);
-      st.camera.lookAt(base.x, base.y + 0.07, base.z);
-      if (st.camera.fov !== 28) { st.camera.fov = 28; st.camera.updateProjectionMatrix(); }
-      if (st.dof) st.dof.target = gp;
+      st.camera.position.set(camPos.x - 0.03 * k + b[0], camPos.y + b[1], camPos.z - 0.05 * k + b[2]);
+      st.camera.lookAt(aimAt);
+      const fov = p.fov ?? 28;
+      if (st.camera.fov !== fov) { st.camera.fov = fov; st.camera.updateProjectionMatrix(); }
+      if (st.dof) st.dof.target = land;
     },
   };
 }
 
 // ---------------------------------------------------------------- cap
+// a water bottle's cap pinched between the thumb and the index and middle fingertips, twisted counter-clockwise
+// (cue "twist") until it gives; tight on the cap, the bottle running out of frame (held below by the other hand)
 async function capShot(st, { p, cues, dur, top }) {
-  // a glass jar of honey on the counter, a gold metal lid; the hand palms the lid and twists it loose
-  const bx = 0.05, bz = -0.22, R = 0.041;
-  const prof = [[0, 0], [R - 0.004, 0], [R, 0.004], [R, 0.085], [R - 0.004, 0.092], [R - 0.006, 0.098]];
-  const glass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.06, transparent: true, opacity: 0.3, clearcoat: 1, clearcoatRoughness: 0.03, specularIntensity: 1 });
-  const jar = new THREE.Mesh(new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 96), glass);
-  jar.position.set(bx, top, bz);
-  st.scene.add(jar);
-  const honey = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.003, R - 0.003, 0.07, 64), new THREE.MeshPhysicalMaterial({ color: 0xd88a1e, roughness: 0.15, transmission: 0.3, thickness: 0.05, clearcoat: 1 }));
-  honey.position.set(bx, top + 0.037, bz);
-  st.scene.add(honey);
-  const lidG = new THREE.CylinderGeometry(R + 0.0015, R + 0.0015, 0.018, 96, 1);
-  const lp = lidG.attributes.position;
-  for (let i = 0; i < lp.count; i++) {
-    const x = lp.getX(i), z = lp.getZ(i), a = Math.atan2(z, x), r = Math.hypot(x, z);
-    if (r > R * 0.9) { const k = 1 + 0.012 * Math.max(0, Math.cos(a * 60)); lp.setX(i, x * k); lp.setZ(i, z * k); }
+  const bx = 0.05, bz = -0.22, by = top + 0.04;
+  const CR = 0.0148, CH = 0.013; // the cap
+  // the bottle: shoulder, neck with its ring, a thread under the cap
+  const prof = [[0, 0], [0.033, 0], [0.034, 0.12], [0.03, 0.15], [0.02, 0.175], [0.0135, 0.188], [0.0135, 0.192], [0.0175, 0.193], [0.0175, 0.196], [0.0135, 0.197], [0.0135, 0.205]];
+  const pet = new THREE.MeshPhysicalMaterial({ color: 0xf4f8fa, roughness: 0.06, transparent: true, opacity: 0.1, clearcoat: 1, clearcoatRoughness: 0.03, specularIntensity: 1, side: THREE.DoubleSide, depthWrite: false });
+  const bottle = new THREE.Mesh(new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 96), pet);
+  bottle.position.set(bx, by, bz);
+  st.scene.add(bottle);
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(0.0315, 0.0325, 0.13, 64), new THREE.MeshPhysicalMaterial({ color: 0xcfe0ea, roughness: 0.04, transparent: true, opacity: 0.09, clearcoat: 1, depthWrite: false }));
+  water.position.set(bx, by + 0.066, bz);
+  st.scene.add(water);
+  // ribbed cap
+  const capG = new THREE.CylinderGeometry(CR, CR, CH, 120, 1);
+  const cp0 = capG.attributes.position;
+  for (let i = 0; i < cp0.count; i++) {
+    const x = cp0.getX(i), z = cp0.getZ(i), a = Math.atan2(z, x), r = Math.hypot(x, z);
+    if (r > CR * 0.9) { const k = 1 + 0.035 * Math.max(0, Math.cos(a * 40)) ** 2; cp0.setX(i, x * k); cp0.setZ(i, z * k); }
   }
-  lidG.computeVertexNormals();
-  const lid = new THREE.Mesh(lidG, new THREE.MeshPhysicalMaterial({ color: 0xd4a94e, metalness: 1, roughness: 0.28, clearcoat: 0.6 }));
-  lid.castShadow = true;
-  st.scene.add(lid);
-  const lidY = top + 0.098 + 0.009;
-  // the hand palm-down on the lid, fingers spread round its edge
+  capG.computeVertexNormals();
+  const cap = new THREE.Mesh(capG, new THREE.MeshPhysicalMaterial({ color: p.capColor ?? 0x2f6fb0, roughness: 0.38, clearcoat: 0.3 }));
+  cap.castShadow = true;
+  st.scene.add(cap);
+  const capY = by + 0.197 + CH / 2;
+  // the pinch: thumb pad and the index/middle pads a cap's width apart, facing
   const h = await loadHand(st);
-  h.holder.add(buildSleeve(st, { suit: 0x6b5a4a, dir: new THREE.Vector3(0.02, 0.35, 1) }));
+  h.holder.add(buildSleeve(st, { suit: 0x6b5a4a }));
   st.scene.add(h.holder);
-  const base = { index: [0.25, 0.2, 0.1], middle: [0.25, 0.2, 0.1], ring: [0.3, 0.2, 0.1], little: [0.35, 0.2, 0.1], thumb: [0.4, 0.2, 0.1], spread: { index: 0.16, middle: 0.0, ring: -0.14, little: -0.3 }, thumbRoll: 0.7 };
-  setPose(h, base);
-  h.holder.position.set(0, 0, 0);
-  h.holder.rotation.set(-0.12, 0.35, 0, 'YXZ');
-  h.holder.updateMatrixWorld(true);
-  const palm = h.bones.f3_1.getWorldPosition(V3()).multiplyScalar(0.62).add(V3(0, -0.018, 0));
-  const hold = V3(bx, lidY + 0.009, bz).sub(palm);
-  h.holder.position.copy(hold);
-  h.holder.updateMatrixWorld(true);
-  const grip = wrap(h, sdf.union(sdf.cylinder(V3(bx, lidY - 0.009, bz), V3(0, 1, 0), R + 0.002, 0.018), sdf.cylinder(V3(bx, top, bz), V3(0, 1, 0), R, 0.1)), { base, thick: 0.0082 });
+  const pinch = solvePinch(h, 2 * CR + 0.006);
+  const tP = padPoint(h, 1), fP = padPoint(h, 2).lerp(padPoint(h, 3), 0.5);
+  const R0 = tP.clone().lerp(fP, 0.5);
+  const nW = fP.clone().sub(tP).normalize();
+  const uH = h.bones.hand.getWorldPosition(V3()).sub(R0);
+  uH.addScaledVector(nW, -uH.dot(nW)).normalize();
+  const basis = (x, y) => new THREE.Matrix4().makeBasis(x, y, V3().crossVectors(x, y));
+  const handF = basis(nW, uH).transpose();
+  // in the world: the pinch axis level across the cap; the wrist up and back toward the person, off to the right
+  const ax = p.axis ?? 2.2, el = p.elev ?? 0.75;
+  const nWw = V3(Math.cos(ax), 0, Math.sin(ax));
+  const away = V3(-Math.sin(ax), 0, Math.cos(ax)); // horizontal, perpendicular to the pinch axis
+  const uHw = away.multiplyScalar(Math.cos(el)).add(V3(0, Math.sin(el), 0)).normalize();
+  const M = basis(nWw, uHw).multiply(handF);
+  const q0 = new THREE.Quaternion().setFromRotationMatrix(M);
+  const off0 = R0.clone().applyQuaternion(q0);
+  const centre = V3(bx, capY, bz);
   const tTw = cues.twist ?? 0.5;
-  const rot0 = h.holder.quaternion.clone();
+  const TW = p.twistAngle ?? 1.1;
   return {
     studio: st,
     update(t) {
-      // twist ~100 degrees, regrip, twist again: the lid comes loose and lifts a few millimetres
+      // closing on the cap, one twist (counter-clockwise from above), and it gives
       const u = t - tTw;
-      const cycle = 1.0;
-      const n = Math.max(0, Math.floor(u / cycle)), f = u > 0 ? (u - n * cycle) / cycle : 0;
-      const turn = ss(clamp(f / 0.55)), back = ss(clamp((f - 0.62) / 0.33));
-      const on = u < 0 ? sstep(-0.35, 0, u) : n >= 2 ? 1 : 1 - sstep(0.55, 0.62, f) * (1 - sstep(0.93, 1.0, f));
-      const done = Math.min(n, 2) * 1.6 + (n < 2 && u > 0 ? turn * 1.6 : 0);
-      const handTurn = u <= 0 ? 0 : n < 2 ? -1.6 * (turn - back) : 0;
-      const lift = n >= 2 ? 0.012 * ss(clamp((u - 2 * cycle) / 0.5)) : 0;
-      setPose(h, mixPose(base, grip, on));
-      const q = new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), handTurn);
-      const c = V3(bx, 0, bz);
-      h.holder.position.copy(hold).sub(c).applyQuaternion(q).add(c).add(V3(0, 0.003 * (1 - on) + lift, 0));
-      h.holder.quaternion.copy(q).multiply(rot0);
-      lid.position.set(bx, lidY + lift + 0.0004 * done, bz);
-      lid.rotation.y = -done;
+      const turn = ss(clamp(u / 0.5));
+      const close = sstep(-0.35, -0.05, u);
+      const q = new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), TW * turn);
+      const open = mixPose(OPEN, pinch.pose, 0.75 + 0.25 * close);
+      setPose(h, open);
+      h.holder.quaternion.copy(q).multiply(q0);
+      h.holder.position.copy(centre).sub(off0.clone().applyQuaternion(q)).add(V3(0, 0.002 * (1 - close) + 0.0008 * sstep(0.35, 0.5, u), 0));
+      cap.position.set(bx, capY + 0.0008 * sstep(0.35, 0.5, u), bz);
+      cap.rotation.y = TW * turn;
       const k = ss(clamp(t / dur));
-      const b = breathe(t, 0.001, 7);
-      st.camera.position.set(bx - 0.26 + 0.03 * k + b[0], lidY + 0.02 + b[1], bz + 0.24 - 0.03 * k + b[2]);
-      st.camera.lookAt(bx, lidY - 0.015, bz);
-      if (st.camera.fov !== 30) { st.camera.fov = 30; st.camera.updateProjectionMatrix(); }
-      if (st.dof) st.dof.target = V3(bx, lidY, bz);
+      const b = breathe(t, 0.0008, 7);
+      const cp = p.cam ?? [-0.16, 0.035, 0.15];
+      st.camera.position.set(bx + cp[0] + 0.015 * k + b[0], capY + cp[1] + b[1], bz + cp[2] - 0.015 * k + b[2]);
+      st.camera.lookAt(bx + (p.aim?.[0] ?? 0.01), capY - (p.aim?.[1] ?? 0.012), bz);
+      const fov = p.fov ?? 26;
+      if (st.camera.fov !== fov) { st.camera.fov = fov; st.camera.updateProjectionMatrix(); }
+      if (st.dof) st.dof.target = centre;
     },
   };
 }

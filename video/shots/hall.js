@@ -20,7 +20,7 @@ const P10 = [0.111, 0.0046, 0.0];
 const BOWL_W = [-0.31, TABLE.top, -0.2];
 const CAMS = {
   wide: { from: { pos: [-1.0, 3.0, 0.75], look: [0.05, -0.45, 0.0], fov: 28 }, to: { pos: [-2.15, 1.95, 1.55], look: [0.05, -0.42, 0.0], fov: 26 } },
-  lee: { from: { pos: [-0.6, 0.17, -0.68], look: [-0.3, -0.04, -0.22], fov: 23 }, to: { pos: [-0.56, 0.15, -0.63], look: [-0.3, -0.045, -0.22], fov: 22 } },
+  lee: { from: { pos: [-0.6, 0.18, -0.69], look: [-0.3, -0.03, -0.22], fov: 24 }, to: { pos: [-0.56, 0.16, -0.64], look: [-0.3, -0.035, -0.22], fov: 23 } },
   machine: { from: { pos: [-0.02, 0.2, 1.12], look: [0.42, 0.13, 0.28], fov: 30 }, to: { pos: [0.04, 0.19, 1.02], look: [0.43, 0.13, 0.28], fov: 29 } },
   empty: { from: { pos: [0.1, 2.05, -0.36], look: [0.0, -0.5, -0.38], fov: 30, up: [0.12, 0, 1] }, to: { pos: [0.06, 1.8, -0.4], look: [0.0, -0.5, -0.4], fov: 30, up: [0.0, 0, 1] } },
   pov: { from: { pos: [-0.04, 0.42, -0.7], look: [0.06, -0.06, 0.02], fov: 36 }, to: { pos: [0.0, 0.32, -0.52], look: [0.1, -0.02, 0.01], fov: 32 } },
@@ -28,8 +28,9 @@ const CAMS = {
 };
 
 // a right hand dipped into the bowl, fingers among the stones
-const STIR = { index: [0.42, 0.42, 0.25], middle: [0.45, 0.45, 0.25], ring: [0.55, 0.5, 0.25], little: [0.62, 0.55, 0.25], thumb: [0.35, 0.25, 0.25], spread: { index: 0.08, middle: 0, ring: -0.06, little: -0.14 }, thumbRoll: 0.2 };
-const STIR2 = { index: [0.52, 0.5, 0.3], middle: [0.5, 0.5, 0.28], ring: [0.6, 0.55, 0.28], little: [0.66, 0.6, 0.28], thumb: [0.45, 0.3, 0.3], spread: { index: 0.04, middle: 0, ring: -0.04, little: -0.1 }, thumbRoll: 0.25 };
+// fingers working the stones, the thumb tucked in over the rim beside them
+const STIR = { index: [0.42, 0.42, 0.25], middle: [0.45, 0.45, 0.25], ring: [0.55, 0.5, 0.25], little: [0.62, 0.55, 0.25], thumb: [0.3, 0.3, 0.3], spread: { index: 0.08, middle: 0, ring: -0.06, little: -0.14, thumb: 0.75 }, thumbRoll: 0.1 };
+const STIR2 = { index: [0.52, 0.5, 0.3], middle: [0.5, 0.5, 0.28], ring: [0.6, 0.55, 0.28], little: [0.66, 0.6, 0.28], thumb: [0.4, 0.35, 0.3], spread: { index: 0.04, middle: 0, ring: -0.04, little: -0.1, thumb: 0.8 }, thumbRoll: 0.15 };
 
 export async function create({ renderer, scale, p, cues, dur }) {
   const st = new Studio({ scale, renderer });
@@ -71,16 +72,17 @@ export async function create({ renderer, scale, p, cues, dur }) {
     hand = await loadHand(st);
     hand.holder.add(buildSleeve(st, { dir: new THREE.Vector3(0.02, 0.28, 1), suit: 0x25272d }));
     st.scene.add(hand.holder);
-    setPose(hand, STIR);
+    setPose(hand, p.stir || STIR);
     // place the hand so its fingertips sit among the stones near the bowl's centre
-    const rot = [-0.62, Math.PI - 0.3, -0.12];
+    const rot = p.handRot || [-0.62, Math.PI - 0.3, -0.12];
     hand.holder.position.set(0, 0, 0);
     hand.holder.rotation.set(...rot, 'YXZ');
     hand.holder.updateMatrixWorld(true);
     const c = V3();
     for (const f of ['f2_3', 'f3_3', 'f4_3']) c.add((hand.bones[f].getObjectByName(`${f}_leaf`) || hand.bones[f]).getWorldPosition(V3()));
     c.multiplyScalar(1 / 3);
-    rest = { pos: V3(BOWL_W[0] + 0.004, TABLE.top + 0.05, BOWL_W[2] - 0.006).sub(c), rot };
+    const off = p.handOff || [0.004, 0.05, -0.006];
+    rest = { pos: V3(BOWL_W[0] + off[0], TABLE.top + off[1], BOWL_W[2] + off[2]).sub(c), rot };
   }
   // the clock face, turned toward the camera of each setup
   if (mode === 'empty') { hall.clockGroup.position.set(-0.4, TABLE.top, 0.16); hall.clockGroup.rotation.y = 0.45; }
@@ -139,7 +141,7 @@ export async function create({ renderer, scale, p, cues, dur }) {
         const w = t * 1.1;
         hand.holder.position.copy(rest.pos).add(V3(0.004 * Math.sin(w), 0.0015 * Math.sin(w * 2 + 1), 0.003 * Math.cos(w)));
         hand.holder.rotation.set(rest.rot[0] + 0.02 * Math.sin(w + 0.5), rest.rot[1] + 0.05 * Math.sin(w * 0.7), rest.rot[2], 'YXZ');
-        setPose(hand, mixPose(STIR, STIR2, 0.5 + 0.5 * Math.sin(w * 1.3)));
+        setPose(hand, mixPose(p.stir || STIR, p.stir2 || STIR2, 0.5 + 0.5 * Math.sin(w * 1.3)));
       }
     },
     overlay(g, t) {
