@@ -17,7 +17,7 @@ export async function setup({ scale, params }) {
   floor.receiveShadow = true;
   st.scene.add(floor);
 
-  const r = await loadBot(st, { mats: botMaterials({ envDiffuse: params.envDiffuse ?? 0.15, white: params.white ?? 0xd9dce0 }) });
+  const r = await loadBot(st, { mats: botMaterials({ envDiffuse: params.envDiffuse ?? 0.35, white: params.white ?? 0xd9dce0 }) });
   r.holder.rotation.y = params.yaw ?? 0.22;
   st.scene.add(r.holder);
 
@@ -25,8 +25,11 @@ export async function setup({ scale, params }) {
   const top = spot(0xf3f6ff, params.top ?? 70, { pos: [0.25, 4.8, 1.0], target: [0, 0.85, 0], angle: 0.3, penumbra: 0.9, radius: 10, near: 2, far: 9, shadow: 2048 });
   const rimL = spot(0xd4e2ff, params.rim ?? 26, { pos: [-1.7, 2.7, -2.4], target: [0, 1.15, 0], angle: 0.42, penumbra: 1, shadow: 0 });
   const rimR = spot(0xffffff, (params.rim ?? 26) * 0.7, { pos: [1.9, 2.3, -2.3], target: [0, 1.05, 0], angle: 0.42, penumbra: 1, shadow: 0 });
-  const fill = spot(0xffffff, params.fill ?? 2, { pos: [-1.4, 1.5, 3.2], target: [0, 1.0, 0], angle: 0.55, penumbra: 1, shadow: 0 });
-  for (const l of [top, rimL, rimR, fill]) st.scene.add(l, l.target);
+  const fill = spot(0xffffff, params.fill ?? 4, { pos: [-1.4, 1.5, 3.2], target: [0, 1.0, 0], angle: 0.55, penumbra: 1, shadow: 0 });
+  // soft side fills at waist height, so the flanks and legs keep some light (shadow, not black)
+  const sideL = spot(0xf4f6fa, params.side ?? 3, { pos: [-2.4, 1.0, 1.4], target: [0, 0.85, 0], angle: 0.5, penumbra: 1, shadow: 0 });
+  const sideR = spot(0xf4f6fa, (params.side ?? 3) * 0.8, { pos: [2.4, 0.9, 1.6], target: [0, 0.8, 0], angle: 0.5, penumbra: 1, shadow: 0 });
+  for (const l of [top, rimL, rimR, fill, sideL, sideR]) st.scene.add(l, l.target);
 
   const cams = {
     full: { pos: [0.5, 0.92, 5.4], look: [0, 0.87, 0], fov: 23 },
@@ -40,7 +43,7 @@ export async function setup({ scale, params }) {
   st.camera.fov = cam.fov;
   st.camera.updateProjectionMatrix();
   st.post({
-    ao: { radius: 0.05, intensity: 1.2 }, dof: null,
+    ao: { radius: 0.05, intensity: params.ao ?? 0.7 }, dof: null,
     bloom: { intensity: 0.22, threshold: 0.85, radius: 0.7 },
     vignette: params.vignette ?? 0.55, exposure: params.exposure ?? 1.0, contrast: 0.08, saturation: -0.08,
   });

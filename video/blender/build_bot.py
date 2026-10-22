@@ -211,6 +211,10 @@ P[:, 1] = y + np.minimum(-pf(x, z - 0.88) - y, 0.0) * wt  # (only ever outward, 
 y_line = np.interp(z, [0.7, 1.03], [0.063, 0.052])
 seat = sstep(z, 0.7, 0.76) * (1 - sstep(z, 0.98, 1.04)) * (1 - sstep(np.abs(x), 0.14, 0.18)) * (ARM < 0.5)
 P[:, 1] = y - 0.5 * np.maximum(y - y_line, 0) * seat
+# the abdomen no further forward than the lower chest: most of what stands in front of that line goes
+line = np.interp(z, [0.86, 0.91, 0.97, 1.04, 1.12, 1.2], [-0.102, -0.111, -0.118, -0.123, -0.127, -0.128])
+ahead = 0.004 * np.logaddexp(0, (line - y) / 0.004)  # (a soft max(0, .), so no crease where it starts)
+P[:, 1] = y + 0.75 * ahead * sstep(z, 0.85, 0.9) * (1 - sstep(z, 1.14, 1.22)) * (ARM < 0.3)
 S.taubin(P, (np.abs(x) < 0.05) * sstep(z, 0.63, 0.66) * (1 - sstep(z, 0.8, 0.84)) * sstep(-y, 0.02, 0.05), 80)
 S.taubin(P, ARM * (z > 0.75), 90)  # arms: soft, not muscular
 S.taubin(P, ARM * (z < 0.8), 12)  # hands: no knuckle creases or nails
