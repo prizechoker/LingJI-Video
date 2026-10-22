@@ -1,11 +1,15 @@
-"""Build data/timeline.json: shots, cues, subtitles and chapters, all anchored to words in the narration.
+"""Build data/timeline.json for the realistic film (engine2): shots, cues, subtitles, chapters and dips to black,
+all anchored to words in the narration (audio/narration.json, made by tools/tts_select.py).
 
-Anchors are (unit, phrase, offset): the time the phrase starts in the narration track, plus offset.
-Special phrases: "^" = unit start, "$" = unit end.
+Anchors: A(unit, phrase, offset) = the time the phrase starts in the narration, plus offset. "^" = unit start,
+"$" = unit end. A shot whose scene module does not exist yet becomes a slate (previews only).
+Subtitle chunks that are quotations (“...”) are shown in the quote style (large, mid-frame).
 """
 import difflib
 import json
+import os
 import re
+import sys
 
 NARR = json.load(open("audio/narration.json", encoding="utf-8"))
 SCRIPT = json.load(open("data/script.json", encoding="utf-8"))
@@ -17,7 +21,7 @@ FPS = 30
 
 def norm(s):
     s = re.sub(r"\d", lambda m: DIG[m.group(0)], s)
-    return [c for c in s if "一" <= c <= "鿿" or c.isalnum()]
+    return [c for c in s.lower() if "一" <= c <= "鿿" or c.isalnum()]
 
 
 def char_times(uid):
@@ -25,20 +29,13 @@ def char_times(uid):
     nu = NU[uid]
     script_chars = norm(UNITS[uid]["tts"])
     asr = [(c, a, b) for c, a, b in nu["chars"]]
-    asr_norm = [norm(c)[0] if norm(c) else c for c, _, _ in asr]
+    asr_norm = [(norm(c) or [c])[0] for c, _, _ in asr]
     sm = difflib.SequenceMatcher(a=script_chars, b=asr_norm, autojunk=False)
     m = {}
     for blk in sm.get_matching_blocks():
         for k in range(blk.size):
             m[blk.a + k] = blk.b + k
-    times = []
-    for i in range(len(script_chars)):
-        if i in m:
-            _, a, b = asr[m[i]]
-            times.append((a, b))
-        else:
-            times.append(None)
-    # interpolate gaps (unmatched chars, e.g. English words) between known neighbours
+    times = [(asr[m[i]][1], asr[m[i]][2]) if i in m else None for i in range(len(script_chars))]
     n = len(times)
     for i in range(n):
         if times[i] is None:
@@ -46,9 +43,7 @@ def char_times(uid):
             hi = next((j for j in range(i + 1, n) if times[j]), None)
             t0 = times[lo][1] if lo is not None else nu["start"]
             t1 = times[hi][0] if hi is not None else nu["end"]
-            span_lo = lo if lo is not None else -1
-            span_hi = hi if hi is not None else n
-            f = (i - span_lo) / (span_hi - span_lo)
+            f = (i - (lo if lo is not None else -1)) / ((hi if hi is not None else n) - (lo if lo is not None else -1))
             tt = t0 + (t1 - t0) * f
             times[i] = (tt, tt + 0.15)
     return script_chars, times
@@ -57,84 +52,125 @@ def char_times(uid):
 CT = {uid: char_times(uid) for uid in UNITS}
 
 
-def at(uid, phrase="^", off=0.0):
+def A(uid, phrase="^", off=0.0):
     nu = NU[uid]
     if phrase == "^":
         return nu["start"] + off
     if phrase == "$":
         return nu["end"] + off
     chars, times = CT[uid]
-    p = norm(phrase)
+    p = "".join(norm(phrase))
     s = "".join(chars)
-    k = s.find("".join(p))
+    k = s.find(p)
     if k < 0:
         raise SystemExit(f"phrase {phrase!r} not found in {uid}: {s}")
     return times[k][0] + off
 
 
-# ---------------------------------------------------------------- storyboard
-A = at
 END = NARR["duration"]
-SB = [
-    dict(scene="go", start=0.0, end=A("U03", "^", 0.05), p=dict(mode="open"),
-         cues=dict(heat=A("U01", "^", 0.1), ghost=A("U01", "拿不起", -0.3), dateIn=A("U02", "^", -0.1),
-                   handIn=A("U02", "很少有人", -0.4), whoIn=A("U02", "都是一位", 0.0), place=A("U02", "放到棋盘上", 0.35))),
-    dict(scene="now", start=A("U03", "^", 0.05), end=A("U04", "$", 0.55), fadeIn=0.25,
-         cues=dict(flip=A("U03", "翻跟头", -0.35), run=A("U03", "跑半马", -0.05), sink=A("U03", "可它", -0.2))),
-    dict(scene="title", start=A("U04", "$", 0.35), end=A("U05", "^", -0.05), fadeIn=0.35, fadeOut=0.3, p=dict(atmos=0.5), cues=dict(title=A("U04", "$", 0.75))),
-    dict(scene="cart", start=A("U05", "^", -0.25), end=A("U06", "$", 0.35), fadeIn=0.3,
-         cues=dict(five=A("U06", "五个小时", -0.1), stop=A("U06", "每走一米", 0.0), think=A("U06", "再想", 0.0))),
-    dict(scene="moravec", start=A("U07", "^", -0.1), end=A("U07", "$", 0.45), fadeIn=0.3,
-         cues=dict(say=A("U07", "他后来总结", 0.0), easy=A("U07", "让电脑下棋", 0.0), hard=A("U07", "难的是", 0.0),
-                   look=A("U07", "看一眼", 0.0), walk=A("U07", "走两步", 0.0), grab=A("U07", "伸手拿", 0.0))),
-    dict(scene="factory", start=A("U08", "^", -0.1), end=A("U11", "$", 0.4), fadeIn=0.3,
-         cues=dict(unimate=A("U09", "^", -0.1), blind=A("U09", "它没有眼睛", -0.05), same=A("U10", "^", 0.0),
-                   board=A("U11", "^", -0.2), boardWord=A("U11", "一张棋盘", -0.1))),
-    dict(scene="simple", start=A("U12", "^", -0.1), end=A("U12", "$", 0.2), fadeIn=0.25, p=dict(mode="bridge")),
-    dict(scene="warehouse", start=A("U13", "^", -0.1), end=A("U13", "$", 0.25), fadeIn=0.25),
-    dict(scene="floor", start=A("U14", "^", -0.1), end=A("U14", "$", 0.3), fadeIn=0.25,
-         cues=dict(only=A("U14", "那就只交给", 0.0), floor=A("U14", "地板", -0.1))),
-    dict(scene="dish", start=A("U15", "^", -0.1), end=A("U15", "$", 0.35), fadeIn=0.25,
-         cues=dict(person=A("U15", "会洗碗的", 0.0), box=A("U15", "而是造了个盒子", 0.0), slot=A("U15", "碗插进格子", 0.0),
-                   close=A("U15", "关门", -0.05), spray=A("U15", "喷水", -0.05))),
-    dict(scene="simple", start=A("U16", "^", -0.1), end=A("U16", "$", 0.9), fadeIn=0.3, p=dict(mode="merge"),
-         cues=dict(**{"not": A("U16", "靠的大多不是", 0.0)}, but=A("U16", "而是我们", 0.0))),
-    dict(scene="home", start=A("U17", "^", -0.1), end=A("U18", "$", 0.45), fadeIn=0.3, p=dict(tint="warm"),
-         cues=dict(home=A("U17", "你家", -0.15), bowls=A("U18", "^", -0.1), shirt=A("U18", "衣服随手", -0.05),
-                   cat=A("U18", "猫还会", 0.0), days=A("U18", "每一天", 0.0))),
-    dict(scene="turn", start=A("U19", "^", -0.1), end=A("U19", "$", 0.25), fadeIn=0.25,
-         cues=dict(lift=A("U19", "改不了世界", -0.05), robot=A("U19", "那就改机器人", 0.0))),
-    dict(scene="design", start=A("U20", "^", -0.1), end=A("U20", "$", 0.3), fadeIn=0.25, p=dict(tint="warm"),
-         cues=dict(door=A("U20", "门把手", -0.05), stairs=A("U20", "楼梯", -0.05), pan=A("U20", "锅铲", -0.05), morph=A("U20", "那干脆", 0.1))),
-    dict(scene="gala", start=A("U21", "^", -0.1), end=A("U21", "$", 0.3), fadeIn=0.25,
-         cues=dict(race=A("U21", "还在半马", -0.1), win=A("U21", "跑赢了", 0.0))),
-    dict(scene="twoways", start=A("U22", "^", -0.1), end=A("U22", "$", 0.35), fadeIn=0.25,
-         cues=dict(bowls=A("U22", "和面对", 0.0), two=A("U22", "是两回事", -0.1))),
-    dict(scene="teleop", start=A("U23", "^", -0.1), end=A("U23", "$", 0.6), fadeIn=0.25,
-         cues=dict(human=A("U23", "背后还要靠", 0.0), far=A("U23", "在远处", 0.0))),
-    dict(scene="go", start=A("U24", "^", -0.25), end=A("U24", "$", 0.35), fadeIn=0.4, p=dict(mode="callback", handStays=True),
-         cues=dict(handIn=A("U24", "^", -1.6), place=A("U24", "$", 9.0), heat=-9, ghost=-9)),
-    dict(scene="hands", start=A("U25", "^", -0.1), end=A("U25", "$", 0.5), fadeIn=0.3, p=dict(tint="warm"),
-         cues=dict(wash=A("U25", "也能洗碗", 0.15), cap=A("U25", "拧开瓶盖", -0.05), catch=A("U25", "接住", -0.15), free=A("U25", "它从来", -0.1))),
-    dict(scene="ending", start=A("U26", "^", -0.1), end=END, fadeIn=0.3,
-         cues=dict(next=A("U27", "^", -0.1), card=A("U27", "$", 0.7))),
-]
-CHAPTERS = [
-    dict(num="02", title="五个小时", start=A("U05", "^", 0.2), end=A("U07", "$", 0.4)),
-    dict(num="03", title="把世界摆成棋盘", start=A("U08", "^", 0.2), end=A("U16", "$", 0.6)),
-    dict(num="04", title="棋盘之外", start=A("U17", "^", 0.2), end=A("U23", "$", 0.5)),
-    dict(num="05", title="那只手", start=A("U24", "^", 0.2), end=A("U27", "$", 0.2)),
-]
 
 
-def subtitles():
+def shot(scene, start, end, p=None, cues=None, fadeIn=0.0, fadeOut=0.0, label=None):
+    return dict(scene=scene, start=start, end=end, p=p or {}, cues=cues or {}, fadeIn=fadeIn, fadeOut=fadeOut, label=label)
+
+
+# ---------------------------------------------------------------- the shot list (docs/ep01-storyboard-v2.md)
+def storyboard():
+    S = []
+    # hook
+    S.append(shot("go_place", 0.0, A("H1", "为什么", -0.08), p=dict(cam="hero", slow=2.6), cues=dict(contact=A("H1", "冠军", 0.05))))
+    S.append(shot("dish", A("H1", "为什么", -0.08), A("H1", "$", 0.5), cues=dict(slip=A("H1", "为什么", 0.25), impact=A("H1", "碗", 0.0))))
+    S.append(shot("go_board", A("H1", "$", 0.5), A("H2", "$", 1.35), p=dict(mode="still", n=37, cam="edge", focus=[0.111, 0, 0], range=0.02)))
+    # 1 第37手
+    S.append(shot("hall", A("A01", "^", -0.7), A("A02", "^", -0.12), p=dict(mode="wide"), cues=dict(date=A("A01", "^", 0.0)), fadeIn=0.6))
+    S.append(shot("hall", A("A02", "^", -0.12), A("A02", "另一边", -0.12), p=dict(mode="lee"), cues=dict(lee=A("A02", "李世石", -0.3))))
+    S.append(shot("hall", A("A02", "另一边", -0.12), A("A03", "^", -0.12), p=dict(mode="machine"), cues=dict(alphago=A("A02", "alphago", -0.2))))
+    S.append(shot("scorecard", A("A03", "^", -0.12), A("A04", "$", 0.55), cues=dict(five=A("A03", "五比零", -0.1), four=A("A03", "四比一", -0.1), lose=A("A04", "输了", -0.12)), fadeIn=0.25))
+    S.append(shot("hall", A("A04", "$", 0.55), A("A05", "$", 0.3), p=dict(mode="empty"), cues=dict(rise=A("A05", "起身", -0.15)), fadeIn=0.3))
+    S.append(shot("go_place", A("A05", "$", 0.3), A("A06", "$", 0.95), p=dict(cam="low", slow=2.2, label=dict(text="第 37 手", size=104, y=280)),
+                  cues=dict(contact=A("A06", "一手", 0.1), label=A("A06", "第三十七手", -0.05))))
+    S.append(shot("commentary", A("A06", "$", 0.95), A("A07", "$", 0.6), cues=dict(strange=A("A07", "很奇怪", -0.7), place=A("A07", "很奇怪", 0.8), mistake=A("A07", "我以为", 0.0)), fadeIn=0.3))
+    S.append(shot("hall", A("A07", "$", 0.6), A("A08", "$", 0.45), p=dict(mode="pov"), cues=dict(think=A("A08", "盯着棋盘", 0.0)), fadeIn=0.3))
+    tw = A("A09", "万分之一", -0.05)
+    S.append(shot("go_board", A("A08", "$", 0.45), A("A10", "$", 0.75), p=dict(mode="heat", cam="top"),
+                  cues=dict(heat=A("A09", "alphago", -0.3), count=tw - 1.8, fade=A("A10", "这不像", 0.4), stone=A("A10", "可它还是", 0.35), close=A("A10", "下了", 0.0)), fadeIn=0.3))
+    S.append(shot("go_board", A("A10", "$", 0.75), A("A11", "$", 0.45), p=dict(mode="lapse", cam="angle", **{"from": 37, "to": 200}),
+                  cues=dict(a=A("A11", "^", 0.2), b=A("A11", "$", 0.0), curve=A("A11", "alphago", -0.15)), fadeIn=0.25))
+    S.append(shot("go_place", A("A11", "$", 0.45), A("A12", "$", 0.9), p=dict(side="W", color="W", n=211, move=211, at=[0.15, -0.219], slow=1.6,
+                  camera=dict(pos=[0.5, 0.12, -0.02], look=[0.13, 0.01, -0.2], fov=26)), cues=dict(contact=A("A12", "投子", 0.15)), fadeIn=0.2))
+    S.append(shot("go_board", A("A12", "$", 0.9), A("A13", "$", 1.2), p=dict(mode="still", n=211, cam="edge", dim=0.35), fadeIn=0.4))
+    # 2 拿不起的棋子
+    S.append(shot("go_place", A("A13", "$", 1.2), A("B15", "$", 0.6), p=dict(cam="reveal", slow=2.0, revealDur=3.6),
+                  cues=dict(contact=A("B14", "细节", 0.2), reveal=A("B15", "并不是", -0.4)), fadeIn=0.5))
+    S.append(shot("hall", A("B15", "$", 0.6), A("B16", "他看着", -0.1), p=dict(mode="watch", caption=dict(name="黄士杰", en="AJA HUANG · DEEPMIND", role="DeepMind 工程师")),
+                  cues=dict(screen=A("B16", "^", 0.6), aja=A("B16", "黄士杰", -0.2)), fadeIn=0.25))
+    t0, t1, t2 = A("B16", "他看着", -0.1), A("B16", "用自己的手", -0.1), A("B16", "落下了", -0.1)
+    S.append(shot("go_place", t0, t1, p=dict(move=39, cam="top", slow=1.0, push=0.05), cues=dict(contact=t1 - 0.25)))
+    S.append(shot("go_place", t1, t2, p=dict(move=41, cam="hero", slow=1.0, push=0.05), cues=dict(contact=t2 - 0.3)))
+    S.append(shot("go_place", t2, A("B16", "$", 0.7), p=dict(move=43, cam="low", slow=1.2, push=0.08), cues=dict(contact=A("B16", "每一颗", 0.2))))
+    S.append(shot("botreach", A("B16", "$", 0.7), A("B17", "$", 1.2), cues=dict(freeze=A("B17", "拿不起", -0.1)), fadeIn=0.35))
+    S.append(shot("botstage", A("B17", "$", 1.2), A("B18", "今天的", -0.1), p=dict(mode="years"),
+                  cues=dict(roll=A("B18", "^", 0.1), land=A("B18", "转眼", 0.2), light=A("B18", "十年过去", 0.2)), fadeIn=0.4))
+    S.append(shot("botstage", A("B18", "今天的", -0.1), A("B18", "可它", -0.1), p=dict(mode="labels"),
+                  cues=dict(flip=A("B18", "翻跟头", -0.05), run=A("B18", "跑半马", -0.05))))
+    S.append(shot("dish", A("B18", "可它", -0.1), A("B18", "$", 0.5), p=dict(seed=19), cues=dict(slip=A("B18", "可它", 0.2), impact=A("B18", "碗", 0.0))))
+    S.append(shot("titlecard", A("B19", "$", 0.3), A("B19", "$", 3.25), cues=dict(title=A("B19", "$", 0.75)), fadeIn=0.5, fadeOut=0.0))
+    # 3 五个小时
+    S.append(shot("cart", A("C20", "^", -0.4), A("C21", "^", -0.1), p=dict(mode="room"), fadeIn=0.6))
+    S.append(shot("cart", A("C21", "^", -0.1), A("C21", "$", 0.5), p=dict(mode="crawl"),
+                  cues=dict(five=A("C21", "五个小时", -0.2), stop=A("C21", "每走一米", 0.0), photo=A("C21", "停下来拍照", 0.1), think=A("C21", "再想", 0.0))))
+    S.append(shot("balance", A("C21", "$", 0.5), A("C22", "$", 0.5), cues=dict(name=A("C22", "莫拉维克", -0.2), easy=A("C22", "让电脑下棋", 0.0), hard=A("C22", "难的是", 0.0),
+                  look=A("C22", "看一眼", 0.0), walk=A("C22", "走两步", 0.0), grab=A("C22", "伸手拿", 0.0)), fadeIn=0.3))
+    S.append(shot("go_place", A("C22", "$", 0.5), A("C23", "$", 0.9), p=dict(cam="hero", slow=2.4, key=7), cues=dict(contact=A("C23", "一只人的手", 0.4)), fadeIn=0.4))
+    # 4 把世界摆成棋盘
+    S.append(shot("factory_grid", A("D24", "^", -0.4), A("D24", "$", 0.4), p=dict(mode="match"), cues=dict(factory=A("D24", "工厂里的", -0.1)), fadeIn=0.5))
+    S.append(shot("unimate", A("D24", "$", 0.4), A("D25", "$", 0.4), p=dict(mode="work"), cues=dict(hot=A("D25", "滚烫的", 0.0)), fadeIn=0.3))
+    S.append(shot("unimate", A("D25", "$", 0.4), A("D26", "$", 0.4), p=dict(mode="blind"), cues=dict(dark=A("D26", "看不见", -0.3))))
+    S.append(shot("unimate", A("D26", "$", 0.4), A("D27", "$", 0.4), p=dict(mode="repeat"), cues=dict(each=A("D27", "每个零件", 0.0), same=A("D27", "同一个位置", 0.0))))
+    S.append(shot("factory_grid", A("D27", "$", 0.4), A("D28", "$", 0.6), p=dict(mode="board"), cues=dict(board=A("D28", "一张棋盘", -0.1)), fadeIn=0.3))
+    S.append(shot("warehouse", A("D28", "$", 0.6), A("D30", "那就在", -0.1), p=dict(mode="wide"), fadeIn=0.3))
+    S.append(shot("warehouse", A("D30", "那就在", -0.1), A("D30", "$", 0.3), p=dict(mode="low"), cues=dict(codes=A("D30", "二维码", -0.3), grid=A("D30", "格子里", -0.1))))
+    S.append(shot("vacuum", A("D30", "$", 0.3), A("D31", "$", 0.3), cues=dict(floor=A("D31", "地板", -0.2)), fadeIn=0.25))
+    S.append(shot("dishwasher", A("D31", "$", 0.3), A("D32", "$", 0.4), cues=dict(slot=A("D32", "碗插进", -0.1), close=A("D32", "关门", -0.1), spray=A("D32", "喷水", -0.1)), fadeIn=0.25))
+    S.append(shot("grids", A("D32", "$", 0.4), A("D33", "$", 1.1), cues=dict(**{"not": A("D33", "靠的大多不是", 0.0)}, but=A("D33", "而是我们", 0.0), simple=A("D33", "变简单了", -0.1)), fadeIn=0.3))
+    # 5 棋盘之外
+    S.append(shot("home", A("D33", "$", 1.1), A("E34", "$", 0.4), p=dict(mode="grid"), cues=dict(**{"break": A("E34", "你家", -0.15)}), fadeIn=0.5))
+    S.append(shot("home", A("E34", "$", 0.4), A("E35", "$", 0.5), p=dict(mode="days"), cues=dict(shirt=A("E35", "衣服随手", -0.1), cat=A("E35", "猫还会", 0.0), days=A("E35", "每一天", -0.1)), fadeIn=0.3))
+    S.append(shot("botgen", A("E35", "$", 0.5), A("E36", "$", 0.35), cues=dict(robot=A("E36", "改机器人", -0.2)), fadeIn=0.3))
+    S.append(shot("design", A("E36", "$", 0.35), A("E37", "$", 0.4), cues=dict(door=A("E37", "门把手", -0.15), stairs=A("E37", "楼梯", -0.15), pan=A("E37", "锅铲", -0.15), robot=A("E37", "那干脆", 0.0)), fadeIn=0.25))
+    S.append(shot("gala", A("E37", "$", 0.4), A("E38", "$", 0.35), cues=dict(race=A("E38", "还在半马", -0.1), win=A("E38", "跑赢了", 0.0)), fadeIn=0.3))
+    S.append(shot("twoways", A("E38", "$", 0.35), A("E39", "$", 0.45), cues=dict(bowls=A("E39", "和面对", -0.1), two=A("E39", "是两回事", -0.1)), fadeIn=0.3))
+    S.append(shot("teleop", A("E39", "$", 0.45), A("E40", "$", 0.3), cues=dict(human=A("E40", "背后还要靠", -0.1), far=A("E40", "在远处", 0.0)), fadeIn=0.3))
+    S.append(shot("go_place", A("E40", "$", 0.3), A("E41", "$", 1.1), p=dict(cam="hero", slow=2.0), cues=dict(contact=A("E41", "那位工程师", 0.2)), fadeIn=0.6))
+    # 6 那只手
+    S.append(shot("hands", A("E41", "$", 1.1), A("F42", "$", 0.7), cues=dict(wash=A("F42", "也能洗碗", 0.0), cap=A("F42", "拧开瓶盖", -0.1), catch=A("F42", "接住", -0.15), free=A("F42", "它从来", -0.1)), fadeIn=0.5))
+    S.append(shot("factory_grid", A("F42", "$", 0.7), A("F43", "$", 0.6), p=dict(mode="cold"), fadeIn=0.4))
+    S.append(shot("homebot", A("F43", "$", 0.6), A("F44", "$", 0.8), fadeIn=0.4))
+    S.append(shot("ending", A("F44", "$", 0.8), END, cues=dict(kitchen=A("F45", "厨房里", -0.2), card=A("F45", "$", 0.9)), fadeIn=0.5))
+    return S
+
+
+CHAPTERS = [("01", "第37手", "A01"), ("02", "拿不起的棋子", "B14"), ("03", "五个小时", "C20"), ("04", "把世界摆成棋盘", "D24"), ("05", "棋盘之外", "E34"), ("06", "那只手", "F42")]
+
+
+def blacks():
+    # dips to black between chapters and around the title
+    return [
+        dict(at=A("H2", "$", 0.75), **{"in": 0.5}, hold=0.25, out=0.6),
+        dict(at=A("B19", "^", -0.45), **{"in": 0.3}, hold=0.0, out=0.0),
+        dict(at=A("B19", "$", 2.85), **{"in": 0.4}, hold=0.2, out=0.6),
+        dict(at=A("C23", "$", 0.4), **{"in": 0.4}, hold=0.2, out=0.5),
+        dict(at=A("D33", "$", 0.6), **{"in": 0.45}, hold=0.2, out=0.5),
+        dict(at=A("E41", "$", 0.6), **{"in": 0.45}, hold=0.2, out=0.6),
+    ]
+
+
+def subtitles(quote_units=("A07", "A13")):
     out = []
-    order = [u["id"] for u in SCRIPT["units"]]
-    for uid in order:
-        u = UNITS[uid]
+    for u in SCRIPT["units"]:
+        uid = u["id"]
         chunks = u["sub"].split("|")
         chars, times = CT[uid]
-        flat = "".join(chars)
         pos = 0
         spans = []
         for ch in chunks:
@@ -144,8 +180,7 @@ def subtitles():
             spans.append((times[k0][0], times[max(k0, k1)][1], ch))
             pos += n
         for i, (s, e, ch) in enumerate(spans):
-            nxt = spans[i + 1][0] if i + 1 < len(spans) else e + 0.35
-            end = min(nxt - 0.02, max(e + 0.25, s + 0.9)) if i + 1 < len(spans) else e + 0.35
+            end = min(spans[i + 1][0] - 0.02, max(e + 0.25, s + 0.9)) if i + 1 < len(spans) else e + 0.35
             segs = []
             for m in re.finditer(r"【([^】]*)】|〔([^〕]*)〕|([^【〔]+)", ch):
                 if m.group(1):
@@ -154,27 +189,36 @@ def subtitles():
                     segs.append(dict(t=m.group(2), c="cyan"))
                 else:
                     segs.append(dict(t=m.group(3)))
-            out.append(dict(start=round(s - 0.06, 3), end=round(end, 3), segs=segs))
+            sub = dict(start=round(s - 0.06, 3), end=round(end, 3), segs=segs)
+            plain = re.sub(r"[【】〔〕]", "", ch)
+            if uid in quote_units and ("“" in plain or "”" in plain or (uid == "A13" and i > 0)):
+                sub["style"] = "quote"
+            out.append(sub)
     return out
 
 
 def main():
     shots = []
-    for s in SB:
+    for i, s in enumerate(storyboard()):
         start, end = s["start"], s["end"]
-        p = dict(s.get("p", {}))
-        if "cues" in s:
-            p["cue"] = {k: round(v - start, 3) for k, v in s["cues"].items()}
-        shots.append(dict(scene=s["scene"], start=round(start, 3), end=round(end, 3), fadeIn=s.get("fadeIn", 0), fadeOut=s.get("fadeOut", 0.3), p=p))
-    tl = dict(
-        fps=FPS, duration=round(END, 3), shots=shots, subtitles=subtitles(),
-        chapters=[{k: (round(v, 3) if isinstance(v, float) else v) for k, v in c.items()} for c in CHAPTERS],
-        disclosure=dict(text="旁白为 AI 合成", start=0.4, end=5.0),
-    )
+        scene = s["scene"]
+        p = dict(s["p"])
+        if not os.path.exists(f"shots/{scene}.js"):
+            p = dict(label=f"{scene} {json.dumps(s['p'], ensure_ascii=False)[:60]}")
+            scene = "slate"
+        cues = {k: round(v, 3) for k, v in s["cues"].items()}
+        shots.append(dict(id=f"s{i:02d}", scene=scene, start=round(start, 3), end=round(end, 3), fadeIn=s["fadeIn"], fadeOut=s["fadeOut"], p=p, cues=cues))
+    chapters = []
+    for num, title, uid in CHAPTERS:
+        t0 = A(uid, "^", -0.2)
+        chapters.append(dict(num=num, title=title, start=round(t0, 3), end=round(t0 + 6.0, 3)))
+    tl = dict(fps=FPS, duration=round(END, 3), grain=0.06, shots=shots, subtitles=subtitles(), chapters=chapters, blacks=blacks(),
+              disclosure=dict(text="旁白为 AI 合成 · 画面为三维重现", start=1.0, end=6.0))
     json.dump(tl, open("data/timeline.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     for s in shots:
-        print(f"{s['scene']:10s} {s['start']:7.2f} -> {s['end']:7.2f}  ({s['end'] - s['start']:5.2f}s)  {s['p'].get('cue', {})}")
-    print("duration", END, "subs", len(tl["subtitles"]))
+        print(f"{s['id']} {s['scene']:12s} {s['start']:7.2f} -> {s['end']:7.2f} ({s['end'] - s['start']:5.2f}s) {s['p'].get('mode', '')} {s['cues']}")
+    bad = [(a['id'], b['id']) for a, b in zip(shots, shots[1:]) if b['start'] - a['end'] > 0.02 or b['start'] < a['start']]
+    print("duration", END, "shots", len(shots), "subs", len(tl["subtitles"]), "gaps/overlaps:", bad or "none")
 
 
 if __name__ == "__main__":

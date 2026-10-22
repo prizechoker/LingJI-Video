@@ -44,7 +44,7 @@ const CHAIRS = [
 
 const CAMS = {
   room: { pos: [-0.72, 0.34, -4.0], to: [-0.3, 0.38, -3.57], look: [1.15, 0.44, -5.85], lookTo: [1.2, 0.47, -5.9], fov: 32 },
-  crawl: { pos: [-1.35, 1.38, 1.9], to: [-1.1, 1.3, 1.45], look: [0.3, 0.4, -3.0], lookTo: [0.55, 0.42, -1.2], fov: 36 },
+  crawl: { pos: [-1.35, 1.38, 1.9], to: [-1.05, 1.28, 1.35], look: [0.3, 0.4, -3.0], lookTo: [0.3, 0.42, -1.05], fov: 36 },
 };
 
 const HMS = (sec) => {
@@ -112,7 +112,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
 
   // the room's own light as the environment (captured once, mid-room, cart and flash hidden)
   {
-    const s0 = mode === 'room' ? { az: -0.2, el: 0.33, I: 6, ...(p.sun || {}) } : { az: -0.1, el: 0.48, I: 5.6 };
+    const s0 = mode === 'room' ? { az: -0.2, el: 0.33, I: 6, ...(p.sun || {}) } : { az: 0.3, el: 0.36, I: 5.6 };
     lab.setSun(s0.az, s0.el, s0.I);
   }
   const envRT = await captureEnv(st, V3(0.3, 1.1, -3.2), { hide: [cart.group, glint] });
@@ -123,7 +123,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     ao: { radius: 0.12, intensity: 1.6, falloff: 0.8 },
     dof: dofOn ? { distance: 2.7, range: 1.5, bokeh: 5 } : null,
     bloom: { intensity: 0.35, threshold: 0.85, radius: 0.8 },
-    vignette: 0.45, contrast: 0.06, saturation: -0.08, exposure: p.exposure ?? 0.95,
+    vignette: 0.45, contrast: 0.06, saturation: -0.08, exposure: p.exposure ?? (mode === 'crawl' ? 1.3 : 1.0),
   });
 
   // ---------------------------------------------------------------- timing
@@ -217,7 +217,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     if (mode === 'room') return { az: -0.2, el: 0.33, I: 6, warm: 0.4, ...(p.sun || {}) };
     const hr = hourAt(t);
     const k = clamp((hr - 12) / 5.4);
-    return { az: lerp(-0.55, 0.42, k), el: lerp(0.62, 0.3, k), I: lerp(6, 5, k), warm: k, ...(p.sun || {}) };
+    return { az: lerp(0.0, 0.567, k), el: lerp(0.5, 0.226, k), I: lerp(6, 5.2, k), warm: k, ...(p.sun || {}) };
   };
 
   const pathPose = (s) => {
@@ -263,9 +263,12 @@ export async function create({ renderer, scale, p, dur, cues }) {
       lab.sun.color.copy(sunCol);
       lab.setClock(hourAt(t));
       // ---- camera
-      const r = mode === 'room' ? ss(clamp(t / dur)) : ss(clamp((t - tStop + 0.8) / Math.max(1, dur - tStop + 0.8)));
+      // room: one slow move over the shot; crawl: locked off for the time-lapse, then a follow pan with the last metre
+      // and a slow push through the pictures and the thinking
+      const r = mode === 'room' ? ss(clamp(t / dur)) : ss(clamp((t - m0 + 0.2) / Math.max(1, dur - m0 + 0.2)));
+      const rl = mode === 'room' ? r : ss(clamp((t - m0 + 0.15) / (m1 - m0 + 0.75)));
       const pos = cam.pos.map((v, i) => lerp(v, (cam.to || cam.pos)[i], r));
-      const look = cam.look.map((v, i) => lerp(v, (cam.lookTo || cam.look)[i], r));
+      const look = cam.look.map((v, i) => lerp(v, (cam.lookTo || cam.look)[i], rl));
       const b = breathe(t, mode === 'room' ? 0.004 : 0.0015, 11);
       st.camera.position.set(pos[0] + b[0], pos[1] + b[1], pos[2] + b[2]);
       st.camera.lookAt(...look);

@@ -22,6 +22,24 @@ import { ss, sstep, clamp, lerp, breathe, grade, V3 } from './lib/kit.js';
 
 const DEG = Math.PI / 180;
 
+// a light cookie: a soft-edged rectangle (half sizes as fractions of the cone's half-width)
+function boardCookie(hx, hy) {
+  const N = 256, c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, N, N);
+  g.filter = `blur(${N * 0.07}px)`;
+  g.fillStyle = '#fff';
+  const w = hx * N, h = hy * N;
+  g.beginPath();
+  g.roundRect(N / 2 - w / 2, N / 2 - h / 2, w, h, N * 0.06);
+  g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 export async function create({ renderer, scale, p, dur, cues }) {
   const mode = p.mode || 'match';
   const st = new Studio({ scale, renderer });
@@ -34,19 +52,20 @@ export async function create({ renderer, scale, p, dur, cues }) {
   st.scene.background = fogCol.clone();
   st.scene.fog = new THREE.FogExp2(fogCol, p.fog ?? (mode === 'board' ? 0.012 : 0.024));
 
-  // the board patch (D28): the two inner blocks either side of the main aisle at j = -1, 0 are left open
-  const BOARD_C = new THREE.Vector2(0, -4 * G[1]);
+  // the board patch (D28): the main aisle plus the two blocks right of it at j = -1, 0 are left open
+  const BOARD_C = new THREE.Vector2(3 * G[0], -4 * G[1]);
   const GO_CELL = [G[0] / 2, G[1] / 2];
-  const openBlock = (r, j) => mode === 'board' && (r === 3 || r === 4) && (j === -1 || j === 0);
+  const openBlock = (r, j) => mode === 'board' && r === 4 && (j === -1 || j === 0);
   const fac = await buildFactory(st, {
     block: (r, j) => (openBlock(r, j) ? null : ((j + r * 2) % 4 === 3 ? 'handle' : 'weld')),
     hazeI: p.haze ?? (mode === 'board' ? 0 : 0.01),
     fixtures: mode !== 'board',
+    jRange: p.jRange || [-7, 2],
   });
   st.scene.add(fac.group);
 
   // light: a cold key from high above (the roof lights as one soft source) + pools under every fixture on the floor
-  const sun = new THREE.DirectionalLight(0xe6efff, p.key ?? 0.7);
+  const sun = new THREE.DirectionalLight(0xe6efff, p.key ?? 0.45);
   sun.position.set(4, 30, 7);
   sun.target.position.set(0, 0, -6);
   sun.castShadow = true;
@@ -57,20 +76,21 @@ export async function create({ renderer, scale, p, dur, cues }) {
   sun.shadow.normalBias = 0.02;
   sun.shadow.radius = 3;
   st.scene.add(sun, sun.target);
-  const hemi = new THREE.HemisphereLight(0xbcd2ec, 0x20262d, p.hemi ?? 0.18);
+  const hemi = new THREE.HemisphereLight(0xbcd2ec, 0x20262d, p.hemi ?? 0.12);
   st.scene.add(hemi);
-  fac.floorMat.userData.u.uPoolCol.value.set(0xdde9ff).multiplyScalar(p.pools ?? 1.8);
-  fac.floorMat.userData.u.uRefCol.value.set(0xeaf3ff).multiplyScalar(p.refl ?? (mode === 'board' ? 0 : 1.2));
+  fac.floorMat.userData.u.uPoolCol.value.set(0xdde9ff).multiplyScalar(p.pools ?? 2.8);
+  fac.floorMat.userData.u.uPoolRad.value.set(1.7, 2.1);
+  fac.floorMat.userData.u.uRefCol.value.set(0xeaf3ff).multiplyScalar(p.refl ?? (mode === 'board' ? 0 : 1.6));
   // the arcs light their cells: two flickering blue-white point lights ride the nearest torches
-  const arcLights = [0, 1].map(() => {
+  const arcLights = [].map(() => {
     const l = new THREE.PointLight(0xc4dcff, 0, 7, 2);
     st.scene.add(l);
     return l;
   });
 
-  // D28: the go grid on the floor, the flanges
-  let flanges = null, drops = null;
-  const tGrid = cues.grid ?? dur * 0.18, tParts = cues.parts ?? dur * 0.36, tBoard = cues.board ?? dur * 0.8;
+  // D28: the go grid on the floor, the flanges, a pool of cold light on the board
+  let flanges = null, drops = null, boardSpot = null;
+  const tBoard = cues.board ?? dur * 0.8, tGrid = cues.grid ?? Math.min(dur * 0.12, tBoard - 1.6), tParts = cues.parts ?? Math.min(dur * 0.42, tBoard - 1.2);
   if (mode === 'board') {
     const U = fac.floorMat.userData.u;
     U.uGoC.value.copy(BOARD_C);
@@ -79,7 +99,12 @@ export async function create({ renderer, scale, p, dur, cues }) {
     U.uGoA.value = 1;
     const moves = (await (await fetch('../data/go_game2.json')).json()).moves;
     const pos = position(moves, p.n ?? 37);
-    flanges = flangeSet(pos.length);
+    flanges = flangeSet(pos.length, { fall: 2.2 });
+    // a cold light over the board, shaped by a soft rectangular cookie to the board's footprint
+    boardSpot = spot(0xdfe9ff, 0, { pos: [BOARD_C.x + 0.6, 24, BOARD_C.y + 1.2], target: [BOARD_C.x, 0, BOARD_C.y], angle: Math.atan(7.6 / 24), penumbra: 0.0, shadow: 2048, radius: 3, near: 10, far: 40 });
+    boardSpot.map = boardCookie(5.9 / 7.6, 6.2 / 7.6);
+    boardSpot.shadow.camera.up.set(0, 0, -1);
+    st.scene.add(boardSpot, boardSpot.target);
     st.scene.add(flanges.group);
     // drop order = move order; they land between tParts and tBoard
     const order = pos.slice().sort((a, b) => a.n - b.n);
@@ -95,6 +120,8 @@ export async function create({ renderer, scale, p, dur, cues }) {
     bloom: { intensity: 0.6, threshold: 0.85, radius: 0.7 },
     vignette: 0.62, contrast: 0.12, saturation: mode === 'cold' ? -0.22 : -0.12, exposure: p.exposure ?? 1.0,
   });
+
+  if (st.aoPass) Object.assign(st.aoPass.configuration, { aoSamples: 6, denoiseSamples: 4, denoiseRadius: 8 });
 
   // ---------------------------------------------------------------- the go board (match mode only)
   let board = null;
@@ -141,10 +168,12 @@ export async function create({ renderer, scale, p, dur, cues }) {
     if (board) setCam(board.camera, [0, hb, 0], -90 * DEG, FOV_B);
   };
   const boardCam = (t) => {
-    const r = ss(clamp(t / dur));
-    const h = lerp(16.2, 14.6, r);
+    // straight down over the board, easing out into a high angle that brings up the cells around it
+    const r = ss(clamp((t - dur * 0.2) / (dur * 0.8)));
+    const el = lerp(90, 63, r) * DEG, d = lerp(15.8, 19.5, ss(clamp(t / dur)));
     const b = breathe(t, 0.01, 2);
-    setCam(st.camera, [BOARD_C.x + b[0], h, BOARD_C.y + b[1]], -90 * DEG, 40, 0, lerp(-1.2, 0.6, r) * DEG);
+    const cz = BOARD_C.y - 1.4 * r;
+    setCam(st.camera, [BOARD_C.x + b[0], d * Math.sin(el) + b[1], cz + d * Math.cos(el) + b[2]], -el, 42);
   };
   const coldCam = (t) => {
     const r = clamp(t / dur);
@@ -179,8 +208,15 @@ export async function create({ renderer, scale, p, dur, cues }) {
       });
       if (mode === 'board') {
         const U = fac.floorMat.userData.u;
-        U.uGoDraw.value = ss(clamp((t - tGrid) / Math.max(0.5, tBoard - 0.25 - tGrid)));
+        const gd = clamp((t - tGrid) / Math.max(0.6, tParts + 0.4 - tGrid));
+        U.uGoDraw.value = gd * (2 - gd) * 0.85 + ss(gd) * 0.15;
         U.uGoOut.value = ss(clamp((t - tGrid - 0.3) / Math.max(0.5, tBoard - tGrid)));
+        const on = ss(clamp((t - tGrid + 0.4) / Math.max(0.8, tBoard - tGrid)));
+        boardSpot.intensity = (p.spot ?? 2600) * (0.3 + 0.7 * on);
+        sun.intensity = (p.key ?? 0.45) * lerp(0.55, 0.2, on);
+        hemi.intensity = lerp(0.12, 0.05, on);
+        st.scene.environmentIntensity = lerp(0.2, 0.1, on);
+        U.uPoolCol.value.set(0xdde9ff).multiplyScalar((p.pools ?? 2.8) * lerp(0.16, 0.03, on));
         U.uGoStar.value = sstep(tBoard - 0.25, tBoard + 0.1, t);
         flanges.pose(drops, t);
       }

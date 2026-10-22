@@ -226,3 +226,59 @@ export function hazeCones(apexes, { height = 9, radius = 2.2, color = 0xbcd6ff, 
   m.frustumCulled = false;
   return m;
 }
+
+// light from many small sources (welding arcs) without real lights: a shader hook that adds a soft inverse-square
+// diffuse term from up to N points to a material. Returns { add(material), set([{ p, k }]) }.
+export function arcGlow(N = 12, { color = 0xc8dcff, power = 1.0, core = 0.25 } = {}) {
+  const U = {
+    uArcP: { value: Array.from({ length: N }, () => new THREE.Vector4(0, -100, 0, 0)) },
+    uArcCol: { value: new THREE.Color(color).multiplyScalar(power) },
+    uArcCore: { value: core },
+  };
+  const add = (mat) => {
+    const prev = mat.onBeforeCompile;
+    mat.onBeforeCompile = (s, r) => {
+      if (prev) prev(s, r);
+      Object.assign(s.uniforms, U);
+      s.vertexShader = s.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vArcW;')
+        .replace('#include <project_vertex>', `#include <project_vertex>
+{
+  vec4 aw = vec4(transformed, 1.0);
+  #ifdef USE_INSTANCING
+    aw = instanceMatrix * aw;
+  #endif
+  vArcW = (modelMatrix * aw).xyz;
+}`);
+      s.fragmentShader = s.fragmentShader
+        .replace('#include <common>', `#include <common>\nvarying vec3 vArcW;\nuniform vec4 uArcP[${N}];\nuniform vec3 uArcCol;\nuniform float uArcCore;`)
+        .replace('#include <opaque_fragment>', `
+{
+  vec3 nW = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
+  vec3 acc = vec3(0.0);
+  for (int k = 0; k < ${N}; k++) {
+    vec4 A = uArcP[k];
+    if (A.w <= 0.0) continue;
+    vec3 L = A.xyz - vArcW;
+    float d2 = dot(L, L);
+    float lam = max(dot(nW, L * inversesqrt(max(d2, 1e-6))), 0.0);
+    acc += A.w * lam / (d2 + uArcCore * uArcCore);
+  }
+  outgoingLight += diffuseColor.rgb * uArcCol * acc;
+}
+#include <opaque_fragment>`);
+    };
+    const key = mat.customProgramCacheKey ? mat.customProgramCacheKey.bind(mat) : () => '';
+    mat.customProgramCacheKey = () => `${key()}|arcglow${N}`;
+    mat.needsUpdate = true;
+    return mat;
+  };
+  const set = (list) => {
+    for (let k = 0; k < N; k++) {
+      const a = list[k];
+      if (a && a.k > 0) U.uArcP.value[k].set(a.p.x, a.p.y, a.p.z, a.k);
+      else U.uArcP.value[k].w = 0;
+    }
+  };
+  return { add, set, uniforms: U };
+}

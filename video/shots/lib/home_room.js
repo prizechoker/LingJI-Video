@@ -5,6 +5,7 @@
 // (x = ROOM.x0); the table centred on the origin, long side along x. Units: metres.
 import { THREE } from '../../engine2/core.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { spot } from '../../engine2/core.js';
 import { rng } from './kit.js';
@@ -71,26 +72,78 @@ function woodBox(w, h, d, r = 0.002, seg = 2) {
   return g;
 }
 
+// ---------------------------------------------------------------- baking
+// merge every static mesh under `root` into one mesh per (material, shadow flags): a room of hundreds of parts
+// becomes a few dozen draw calls (each shadow pass draws them all again). Instanced and transparent meshes, and
+// anything in `keep` (or under it), stay as they are.
+export function bake(root, { keep = [] } = {}) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const buckets = new Map();
+  const drop = [];
+  const kept = (o) => { for (let a = o; a && a !== root; a = a.parent) if (keep.includes(a)) return true; return false; };
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || kept(o) || !o.visible) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (mats.some((m) => m.transparent || m.isShaderMaterial)) return;
+    const m4 = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+    const src = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    src.applyMatrix4(m4);
+    const flip = m4.determinant() < 0;
+    const n = src.attributes.position.count;
+    const groups = Array.isArray(o.material) && src.groups.length ? src.groups : [{ start: 0, count: n, materialIndex: 0 }];
+    for (const gr of groups) {
+      const mat = mats[gr.materialIndex] || mats[0];
+      const cnt = Math.min(gr.count, n - gr.start);
+      if (cnt <= 0) continue;
+      const g = new THREE.BufferGeometry();
+      for (const name of ['position', 'normal', 'uv']) {
+        const a = src.attributes[name];
+        const size = name === 'uv' ? 2 : 3;
+        const out = new Float32Array(cnt * size);
+        if (a) for (let i = 0; i < cnt; i++) for (let c = 0; c < size; c++) out[i * size + c] = a.array[(gr.start + i) * a.itemSize + c];
+        if (flip) for (let i = 0; i + 2 < cnt; i += 3) for (let c = 0; c < size; c++) {
+          const t = out[(i + 1) * size + c]; out[(i + 1) * size + c] = out[(i + 2) * size + c]; out[(i + 2) * size + c] = t;
+        }
+        g.setAttribute(name, new THREE.BufferAttribute(out, size));
+      }
+      const key = `${mat.uuid}|${o.castShadow}|${o.receiveShadow}`;
+      if (!buckets.has(key)) buckets.set(key, { mat, cast: o.castShadow, recv: o.receiveShadow, geos: [] });
+      buckets.get(key).geos.push(g);
+    }
+    drop.push(o);
+  });
+  for (const o of drop) o.parent.remove(o);
+  for (const b of buckets.values()) {
+    const m = new THREE.Mesh(mergeGeometries(b.geos), b.mat);
+    m.castShadow = b.cast;
+    m.receiveShadow = b.recv;
+    root.add(m);
+  }
+  // empty groups left behind are harmless
+  return root;
+}
+
 // ---------------------------------------------------------------- materials
 export function homeMaterials(st, env) {
   const M = {};
   const wall = st.pbr('PaintedPlaster017', { repeat: [0.45, 0.45] });
-  M.wall = new THREE.MeshStandardMaterial({ ...wall, color: 0xe6ddcd, roughness: 0.92, normalScale: new THREE.Vector2(0.5, 0.5) });
-  M.wallBack = new THREE.MeshStandardMaterial({ ...wall, color: 0xd8cbb6, roughness: 0.92, normalScale: new THREE.Vector2(0.5, 0.5) });
+  M.wall = new THREE.MeshStandardMaterial({ ...wall, color: 0xf3eadb, roughness: 0.92, normalScale: new THREE.Vector2(0.5, 0.5) });
+  M.wallBack = new THREE.MeshStandardMaterial({ ...wall, color: 0xefe2cc, roughness: 0.92, normalScale: new THREE.Vector2(0.5, 0.5) });
   M.ceiling = new THREE.MeshStandardMaterial({ color: 0xe9e4da, roughness: 0.95 });
   const fl = st.pbr('WoodFloor051', { repeat: [0.42, 0.42] });
-  M.floor = new THREE.MeshPhysicalMaterial({ ...fl, color: 0xc89a76, roughness: 0.75, clearcoat: 0.25, clearcoatRoughness: 0.35 });
+  M.floor = new THREE.MeshPhysicalMaterial({ ...fl, color: 0xc9b29c, roughness: 0.7, clearcoat: 0.25, clearcoatRoughness: 0.35 });
   const oak = st.pbr('Wood022', { repeat: [0.7, 0.7] });
   M.oak = new THREE.MeshPhysicalMaterial({ ...oak, color: 0xe2c49c, roughness: 0.55, clearcoat: 0.2, clearcoatRoughness: 0.4 });
   const wal = st.pbr('Wood026', { repeat: [0.8, 0.8] });
   M.walnut = new THREE.MeshPhysicalMaterial({ ...wal, color: 0xb28a6c, roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.3 });
-  M.chair = new THREE.MeshPhysicalMaterial({ ...st.pbr('Wood026', { repeat: [1.6, 1.6] }), color: 0xa27a5a, roughness: 0.5, clearcoat: 0.3, clearcoatRoughness: 0.35 });
+  M.chairWood = new THREE.MeshPhysicalMaterial({ ...st.pbr('Wood022', { repeat: [2.2, 2.2] }), color: 0xcfa77e, roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.35 });
   M.paint = new THREE.MeshStandardMaterial({ color: 0xf0ebe2, roughness: 0.45 });  // trim: skirting, casing, frames
   const rug = st.pbr('Carpet016', { repeat: [1.3, 1.3] });
   M.rug = new THREE.MeshStandardMaterial({ ...rug, color: 0xc9b29a, roughness: 1, normalScale: new THREE.Vector2(0.8, 0.8) });
   const lin = st.pbr('Fabric082A', { repeat: [3, 3] });
-  M.linen = new THREE.MeshPhysicalMaterial({ ...lin, color: 0xeae2d3, roughness: 0.95, sheen: 0.6, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xfff2e0), side: THREE.DoubleSide });
-  M.seat = new THREE.MeshPhysicalMaterial({ ...st.pbr('Fabric030', { repeat: [4, 4] }), color: 0x8a7a68, roughness: 1, sheen: 0.5, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xd8c8b0) });
+  M.linen = new THREE.MeshPhysicalMaterial({ ...lin, color: 0xf4ede2, roughness: 0.95, sheen: 0.3, sheenRoughness: 0.8, sheenColor: new THREE.Color(0xfff2e0), side: THREE.DoubleSide, normalScale: new THREE.Vector2(0.4, 0.4) });
+  M.seat = new THREE.MeshPhysicalMaterial({ ...st.pbr('Fabric030', { repeat: [4, 4] }), color: 0xe0cfb4, roughness: 1, sheen: 0.5, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xd8c8b0) });
   M.brass = new THREE.MeshPhysicalMaterial({ color: 0xcfa968, metalness: 1, roughness: 0.32, envMap: env, envMapIntensity: 1.2 });
   M.black = new THREE.MeshPhysicalMaterial({ color: 0x1a1a1a, metalness: 0.6, roughness: 0.45 });
   M.glass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.1, envMap: env, envMapIntensity: 1.5, depthWrite: false });
@@ -214,7 +267,7 @@ function curtain(M, { width = 0.55, top = 2.45, drop = 2.43, folds = 7, seed = 2
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i);
     const u = (x / width + 0.5), v = (y / drop + 0.5); // v = 1 at the top
-    const amp = 0.035 + 0.012 * (1 - v);
+    const amp = 0.022 + 0.008 * (1 - v);
     const z = amp * Math.sin(u * folds * Math.PI * 2 + ph + 0.4 * Math.sin(v * 3 + u * 5)) + 0.01 * Math.sin(u * 31 + v * 2);
     pos.setZ(i, z);
     pos.setY(i, y + 0.006 * Math.sin(u * folds * Math.PI * 2));
@@ -240,7 +293,7 @@ export function diningTable(M) {
     if (rot) a.rotation.y = Math.PI / 2;
     g.add(a);
   }
-  const lg = new THREE.CylinderGeometry(0.028, 0.019, top - t, 4, 1).toNonIndexed();
+  const lg = new THREE.CylinderGeometry(0.04, 0.028, top - t, 4, 1).toNonIndexed();
   lg.rotateY(Math.PI / 4);
   const lgeo = woodBoxFrom(lg);
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
@@ -258,64 +311,101 @@ function woodBoxFrom(geo) {
   return geo;
 }
 
-// a solid-wood dining chair, seat front toward +z, its back at -z; seat 0.46 high
-export function chair(M, { cushion = true } = {}) {
+// a solid oak dining chair, seat front toward +z, its back at -z; seat 0.46 high, back 0.88: square tapered legs,
+// aprons, a curved top rail and a lower rail between back posts that rake back; a thin wool seat pad
+export function chair(M, { cushion = true, mat = null } = {}) {
+  const W = mat || M.chairWood;
   const g = new THREE.Group();
-  const sw = 0.44, sd = 0.42, sh = 0.46;
-  const seat = mesh(woodBox(sw, 0.03, sd, 0.008, 3), M.chair);
-  seat.position.set(0, sh - 0.015, 0);
+  const sw = 0.45, sd = 0.43, sh = 0.455, lt = 0.036;
+  const seat = mesh(woodBox(sw, 0.026, sd, 0.008, 3), W);
+  seat.position.set(0, sh - 0.013, 0);
   g.add(seat);
   if (cushion) {
-    const c = mesh(new RoundedBoxGeometry(sw - 0.05, 0.035, sd - 0.05, 4, 0.016), M.seat);
-    c.position.set(0, sh + 0.016, 0.01);
+    const c = mesh(new RoundedBoxGeometry(sw - 0.06, 0.03, sd - 0.06, 4, 0.013), M.seat);
+    c.position.set(0, sh + 0.014, 0.012);
     g.add(c);
   }
-  const legGeo = woodBoxFrom(new THREE.CylinderGeometry(0.016, 0.013, sh - 0.03, 16));
-  for (const [sx, sz] of [[-1, 1], [1, 1]]) {
-    const l = mesh(legGeo, M.chair);
-    l.position.set(sx * (sw / 2 - 0.03), (sh - 0.03) / 2, sz * (sd / 2 - 0.03));
-    l.rotation.x = 0.03;
+  // front legs: square, tapering toward the floor
+  const fl = new THREE.CylinderGeometry(lt * 0.71, lt * 0.55, sh - 0.026, 4, 1).toNonIndexed();
+  fl.rotateY(Math.PI / 4);
+  const flg = woodBoxFrom(fl);
+  for (const sx of [-1, 1]) {
+    const l = mesh(flg, W);
+    l.position.set(sx * (sw / 2 - lt / 2 - 0.004), (sh - 0.026) / 2, sd / 2 - lt / 2 - 0.004);
     g.add(l);
   }
-  // back legs run up into the back posts, raked back
-  const bh = 0.92;
-  const postCurve = (sx) => new THREE.CatmullRomCurve3([
-    new THREE.Vector3(sx * (sw / 2 - 0.03), 0, -sd / 2 + 0.035), new THREE.Vector3(sx * (sw / 2 - 0.03), sh - 0.02, -sd / 2 + 0.03),
-    new THREE.Vector3(sx * (sw / 2 - 0.035), 0.7, -sd / 2 + 0.0), new THREE.Vector3(sx * (sw / 2 - 0.04), bh, -sd / 2 - 0.045),
-  ]);
-  for (const sx of [-1, 1]) {
-    const p = mesh(new THREE.TubeGeometry(postCurve(sx), 40, 0.0155, 12, false), M.chair);
-    g.add(p);
-  }
-  // a curved top rail (where a sweater gets thrown) and a mid rail
-  const rail = (y, zc, h, bow) => {
-    const c = new THREE.CatmullRomCurve3([-1, -0.5, 0, 0.5, 1].map((u) => new THREE.Vector3(u * (sw / 2 - 0.035), y, zc - bow * (1 - u * u))));
-    const tube = new THREE.TubeGeometry(c, 40, 1, 12, false);
+  // back legs run on up as the back posts: a square section swept along a raked curve
+  const bh = 0.88, zb = -sd / 2 + lt / 2 + 0.004;
+  const post = (sx) => {
+    const c = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, zb - 0.035), new THREE.Vector3(0, 0.2, zb - 0.012), new THREE.Vector3(0, sh - 0.02, zb),
+      new THREE.Vector3(0, 0.66, zb - 0.02), new THREE.Vector3(0, bh, zb - 0.07),
+    ], false, 'centripetal');
+    const tube = new THREE.TubeGeometry(c, 48, 1, 4, false).toNonIndexed();
     const ps = tube.attributes.position;
-    // flatten into a slat h tall, 0.022 thick
     const cen = new THREE.Vector3();
     for (let i = 0; i < ps.count; i++) {
-      const k = Math.floor(i / 13);
-      c.getPointAt(k / 40, cen);
-      const dy = ps.getY(i) - cen.y, dz = ps.getZ(i) - cen.z;
-      const L = Math.hypot(dy, dz) || 1;
-      ps.setY(i, cen.y + (dy / L) * h * 0.5);
-      ps.setZ(i, cen.z + (dz / L) * 0.011);
+      // find the ring this vertex belongs to by its nearest curve point (rings are 5 verts in the indexed version)
+      const y = ps.getY(i);
+      let best = 0, bd = 1e9;
+      for (let k = 0; k <= 48; k++) {
+        c.getPointAt(k / 48, cen);
+        const d = Math.abs(cen.y - y) + 0.001 * Math.abs(cen.z - ps.getZ(i));
+        if (d < bd) { bd = d; best = k; }
+      }
+      c.getPointAt(best / 48, cen);
+      const dx = ps.getX(i) - cen.x, dz = ps.getZ(i) - cen.z, dy = ps.getY(i) - cen.y;
+      const L = Math.hypot(dx, dy, dz) || 1;
+      const u = best / 48, r = lt * (0.5 - 0.12 * Math.abs(u - 0.4));
+      ps.setXYZ(i, cen.x + (dx / L) * r * 1.414, cen.y + (dy / L) * r * 1.414, cen.z + (dz / L) * r * 1.414);
     }
     tube.computeVertexNormals();
-    return mesh(tube, M.chair);
+    woodBoxFrom(tube);
+    const m = mesh(tube, W);
+    m.position.x = sx * (sw / 2 - lt / 2 - 0.004);
+    return m;
   };
-  g.add(rail(bh - 0.045, -sd / 2 - 0.04, 0.075, 0.035));
-  g.add(rail(0.66, -sd / 2 + 0.003, 0.035, 0.025));
-  // stretchers
-  const st = woodBoxFrom(new THREE.CylinderGeometry(0.008, 0.008, sw - 0.06, 10));
-  for (const z of [-sd / 2 + 0.035, sd / 2 - 0.035]) {
-    const s = mesh(st, M.chair);
-    s.rotation.z = Math.PI / 2;
-    s.position.set(0, 0.16, z);
+  g.add(post(-1), post(1));
+  // aprons under the seat
+  for (const [w2, x, z, ry] of [[sw - 2 * lt, 0, sd / 2 - lt / 2 - 0.006, 0], [sw - 2 * lt, 0, zb, 0], [sd - 2 * lt, -(sw / 2 - lt / 2 - 0.006), 0, 1], [sd - 2 * lt, sw / 2 - lt / 2 - 0.006, 0, 1]]) {
+    const a = mesh(woodBox(w2, 0.055, 0.018, 0.003), W);
+    a.position.set(x, sh - 0.026 - 0.0275, z);
+    if (ry) a.rotation.y = Math.PI / 2;
+    g.add(a);
+  }
+  // the back: a deep curved top rail and a slimmer lower rail
+  const rail = (y, h, bow, zc) => {
+    const span = sw - lt - 0.008;
+    const sh2 = new THREE.Shape();
+    const N = 24;
+    for (let k = 0; k <= N; k++) {
+      const u = -1 + (2 * k) / N, x = (u * span) / 2, z = zc - bow * (1 - u * u);
+      if (k === 0) sh2.moveTo(x, z); else sh2.lineTo(x, z);
+    }
+    for (let k = N; k >= 0; k--) {
+      const u = -1 + (2 * k) / N, x = (u * span) / 2, z = zc - bow * (1 - u * u) - 0.022;
+      sh2.lineTo(x, z);
+    }
+    sh2.closePath();
+    const geo = new THREE.ExtrudeGeometry(sh2, { depth: h, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 3, curveSegments: 8 });
+    geo.rotateX(Math.PI / 2);
+    geo.translate(0, y + h / 2, 0);
+    woodBoxFrom(geo);
+    geo.computeVertexNormals();
+    return mesh(geo, W);
+  };
+  g.add(rail(bh - 0.075, 0.07, 0.03, zb - 0.055));
+  g.add(rail(0.6, 0.035, 0.02, zb - 0.0));
+  // a low side stretcher on each side and one across
+  for (const sx of [-1, 1]) {
+    const s = mesh(woodBox(0.016, 0.022, sd - 0.06, 0.003), W);
+    s.position.set(sx * (sw / 2 - lt / 2 - 0.004), 0.15, 0);
     g.add(s);
   }
-  g.userData.topRail = { y: bh - 0.01, z: -sd / 2 - 0.04 - 0.035, w: sw - 0.07, r: 0.016 };
+  const sx2 = mesh(woodBox(sw - 2 * lt, 0.018, 0.016, 0.003), W);
+  sx2.position.set(0, 0.18, 0);
+  g.add(sx2);
+  g.userData.topRail = { y: bh - 0.005, z: zb - 0.055 - 0.03 - 0.011, w: sw - lt, r: 0.02 };
   g.userData.seat = { y: sh + 0.03, w: sw, d: sd };
   return g;
 }
@@ -436,18 +526,18 @@ export function pendant(M, { y = 1.52 } = {}) {
   const g = new THREE.Group();
   const outer = new THREE.MeshPhysicalMaterial({ color: 0x2d3d33, metalness: 0.3, roughness: 0.35, clearcoat: 0.7, clearcoatRoughness: 0.15 });
   const inner = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffc98a, emissiveIntensity: 0.9, roughness: 0.6, side: THREE.BackSide });
-  const prof = [[0.215, 0.0], [0.2, 0.04], [0.15, 0.1], [0.08, 0.16], [0.05, 0.19], [0.04, 0.2], [0.02, 0.2]];
+  const prof = [[0.25, 0.0], [0.235, 0.05], [0.19, 0.12], [0.11, 0.19], [0.06, 0.225], [0.045, 0.24], [0.02, 0.24]];
   const dome = mesh(lathe(prof, 64), outer, { cast: true, receive: false });
   const dIn = mesh(lathe(prof.map(([r, yy]) => [r - 0.002, yy]), 64), inner, { cast: false, receive: false });
   g.add(dome, dIn);
-  const rim = mesh(new THREE.TorusGeometry(0.215, 0.003, 8, 64), M.brass, { cast: false });
+  const rim = mesh(new THREE.TorusGeometry(0.25, 0.003, 8, 64), M.brass, { cast: false });
   rim.rotation.x = Math.PI / 2;
   g.add(rim);
   const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 24, 16), new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.82, 0.6).multiplyScalar(4) }));
   bulb.position.y = 0.09;
   g.add(bulb);
-  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, ROOM.h - y - 0.2, 6), M.black);
-  cord.position.y = 0.2 + (ROOM.h - y - 0.2) / 2;
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, ROOM.h - y - 0.24, 6), M.black);
+  cord.position.y = 0.24 + (ROOM.h - y - 0.24) / 2;
   g.add(cord);
   const rose = mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.025, 32), outer);
   rose.position.y = ROOM.h - y - 0.0125;
@@ -646,6 +736,70 @@ export function branchVase(M, { seed = 6 } = {}) {
   return g;
 }
 
+// an upholstered armchair (wool, ochre) on short walnut legs, a loose seat cushion; front toward +z
+export function armchair(M, { color = 0xb07a3a } = {}) {
+  const g = new THREE.Group();
+  const fab = new THREE.MeshPhysicalMaterial({ ...M.seat, color, sheen: 0.7, sheenRoughness: 0.45, sheenColor: new THREE.Color(0xffe0b0) });
+  fab.map = M.seat.map; fab.normalMap = M.seat.normalMap; fab.roughnessMap = M.seat.roughnessMap;
+  const W = 0.78, D = 0.78, legH = 0.12;
+  const ub = (w, h, d, r, x, y, z, rx = 0) => {
+    const m = mesh(new RoundedBoxGeometry(w, h, d, 5, r), fab);
+    m.position.set(x, y, z);
+    m.rotation.x = rx;
+    g.add(m);
+    return m;
+  };
+  ub(W, 0.2, D, 0.05, 0, legH + 0.1, 0);                         // base
+  ub(0.15, 0.36, D - 0.02, 0.06, -W / 2 + 0.075, legH + 0.33, 0.0); // arms
+  ub(0.15, 0.36, D - 0.02, 0.06, W / 2 - 0.075, legH + 0.33, 0.0);
+  ub(W - 0.04, 0.62, 0.17, 0.07, 0, legH + 0.52, -D / 2 + 0.1, -0.12); // back
+  ub(W - 0.3, 0.13, D - 0.22, 0.05, 0, legH + 0.26, 0.07);          // seat cushion
+  ub(W - 0.32, 0.36, 0.14, 0.06, 0, legH + 0.5, -D / 2 + 0.24, -0.2); // back cushion
+  const lg = woodBoxFrom(new THREE.CylinderGeometry(0.018, 0.012, legH, 12));
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const l = mesh(lg, M.walnut);
+    l.position.set(sx * (W / 2 - 0.07), legH / 2, sz * (D / 2 - 0.07));
+    g.add(l);
+  }
+  // a knitted throw over one arm
+  const throwM = new THREE.MeshPhysicalMaterial({ color: 0xe8dfcf, roughness: 1, sheen: 0.8, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffffff) });
+  const knit = M.knit;
+  if (knit) { throwM.map = knit.map; throwM.normalMap = knit.normalMap; throwM.color = new THREE.Color(0xd8cdb8); }
+  const tg = new THREE.PlaneGeometry(0.5, 0.95, 20, 40);
+  const tp = tg.attributes.position;
+  for (let i = 0; i < tp.count; i++) {
+    const x = tp.getX(i), y = tp.getY(i);
+    // drape over the arm (a cylinder along z): wrap y around
+    const a = (y / 0.95) * Math.PI * 1.15;
+    const r = 0.1 + 0.004 * Math.sin(x * 40);
+    tp.setXYZ(i, Math.sin(a) * r, Math.cos(a) * r - Math.max(0, Math.abs(a) - 1.4) * 0.12, x + 0.01 * Math.sin(y * 30));
+  }
+  tg.computeVertexNormals();
+  const th = mesh(tg, throwM);
+  th.material.side = THREE.DoubleSide;
+  th.position.set(W / 2 - 0.075, legH + 0.42, 0.05);
+  g.add(th);
+  return g;
+}
+
+// a round walnut side table on three splayed legs
+export function sideTable(M, { r = 0.24, h = 0.56 } = {}) {
+  const g = new THREE.Group();
+  const top = mesh(new THREE.CylinderGeometry(r, r - 0.005, 0.025, 48), M.walnut);
+  top.position.y = h - 0.0125;
+  g.add(top);
+  const lg = woodBoxFrom(new THREE.CylinderGeometry(0.016, 0.011, h, 12));
+  for (let k = 0; k < 3; k++) {
+    const a = (k * 2 * Math.PI) / 3;
+    const l = mesh(lg, M.walnut);
+    l.position.set(Math.cos(a) * r * 0.55, h / 2, Math.sin(a) * r * 0.55);
+    l.rotation.set(Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12);
+    g.add(l);
+  }
+  g.userData.top = h;
+  return g;
+}
+
 // ---------------------------------------------------------------- doors (the door is also the handle close-up)
 // a four-panel oak door, w x h, hinge side at x = 0, latch side at x = w; the face toward +z; lever handle both sides
 export function door(M, { w = 0.84, h = 2.04, t = 0.04, handle = 'brass' } = {}) {
@@ -736,7 +890,7 @@ export function leverHandle(mat) {
 }
 
 // ---------------------------------------------------------------- the whole room
-export async function buildHome(st, env, { hall = true } = {}) {
+export async function buildHome(st, env, { hall = true, bake: bakeIt = true } = {}) {
   const M = homeMaterials(st, env);
   const g = new THREE.Group();
   const { x0, x1, z0, z1, h, door: dr, win } = ROOM;
@@ -748,6 +902,7 @@ export async function buildHome(st, env, { hall = true } = {}) {
   const ceil = mesh(new THREE.PlaneGeometry(W, D).rotateX(Math.PI / 2), M.ceiling, { cast: false });
   ceil.position.set((x0 + x1) / 2, h, (z0 + z1) / 2);
   g.add(ceil);
+  const overhead = [ceil];
   // back wall with the doorway
   const back = wallWithHoles(W, h, [[dr.x0 - x0, 0, dr.x1 - x0, dr.h]], M.wallBack);
   back.position.set(x0, 0, z0);
@@ -840,6 +995,7 @@ export async function buildHome(st, env, { hall = true } = {}) {
     const hc = mesh(new THREE.PlaneGeometry(hx1 - hx0, z0 - hz0).rotateX(Math.PI / 2), M.ceiling, { cast: false });
     hc.position.set((hx0 + hx1) / 2, h, (z0 + hz0) / 2);
     g.add(hc);
+    overhead.push(hc);
     // the back of the doorway wall, seen from the hall
     const hbw = mesh(new THREE.PlaneGeometry(hx1 - hx0, h), M.wall);
     hbw.rotation.y = Math.PI;
@@ -855,7 +1011,7 @@ export async function buildHome(st, env, { hall = true } = {}) {
     g.add(d);
     parts.door = d;
     // a faint cool window light at the hall's end (a glazed door to a balcony)
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.9), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.25, 0.32, 0.45) }));
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.9), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.1, 0.13, 0.19) }));
     glow.position.set((hx0 + hx1) / 2 + 0.2, 1.05, hz0 + 0.01);
     g.add(glow);
   }
@@ -936,10 +1092,30 @@ export async function buildHome(st, env, { hall = true } = {}) {
   // the pendant
   const pd = pendant(M, { y: 1.5 });
   g.add(pd);
+  overhead.push(pd, rod);
+  // a reading corner at the front left: armchair, side table, a lamp (its light throws the long shadows)
+  const ac = armchair(M);
+  ac.position.set(-1.95, 0, 1.35);
+  ac.rotation.y = 0.75;
+  g.add(ac);
+  const stb = sideTable(M);
+  stb.position.set(-2.18, 0, 2.05);
+  g.add(stb);
+  const lamp2 = tableLamp(M, { h: 0.42, color: 0xd9cfbf });
+  lamp2.position.set(-2.18, stb.userData.top, 2.05);
+  g.add(lamp2);
 
+  if (bakeIt) {
+    for (const c of chairs) bake(c);
+    bake(g, { keep: [...chairs, ...overhead] });
+    for (const o of overhead) if (o.isGroup) bake(o);
+  }
   return {
-    group: g, M, table, chairs, sideboard: sb, lamp, pendant: pd, parts,
-    anchors: { lampBulb: lamp.position.clone().add(lamp.userData.bulb), pendant: new THREE.Vector3(0, 1.5 + 0.09, 0) },
+    group: g, M, table, chairs, sideboard: sb, lamp, lamp2, pendant: pd, parts, armchair: ac, overhead,
+    anchors: {
+      lampBulb: lamp.position.clone().add(lamp.userData.bulb), pendant: new THREE.Vector3(0, 1.5 + 0.09, 0),
+      lamp2Bulb: lamp2.position.clone().add(lamp2.userData.bulb),
+    },
   };
 }
 
@@ -955,14 +1131,19 @@ export function homeLights(st, H, k = {}) {
   L.pendant.shadow.normalBias = 0.01;
   L.lamp = new THREE.PointLight(0xffb870, 1.6 * (k.lamp ?? 1), 0, 2);
   L.lamp.position.copy(H.anchors.lampBulb);
-  L.ceiling = new THREE.PointLight(0xffd2a0, 0.5 * (k.pendant ?? 1), 0, 2);
-  L.ceiling.position.set(pp.x, pp.y + 0.5, pp.z);
   const { win, x0 } = ROOM;
-  L.window = new THREE.RectAreaLight(0x8ea4d8, 2.2 * (k.window ?? 1), win.z1 - win.z0, win.y1 - win.y0);
-  L.window.position.set(x0 - 0.05, (win.y0 + win.y1) / 2, (win.z0 + win.z1) / 2);
-  L.window.lookAt(x0 + 1, (win.y0 + win.y1) / 2, (win.z0 + win.z1) / 2);
-  L.hall = new THREE.PointLight(0x9fb4e0, 0.8 * (k.hall ?? 1), 0, 2);
-  L.hall.position.set((ROOM.door.x0 + ROOM.door.x1) / 2 + 0.2, 2.2, ROOM.hall.z0 + 0.8);
-  st.scene.add(L.pendant, L.pendant.target, L.lamp, L.ceiling, L.window, L.hall);
+  if (k.area) {
+    L.window = new THREE.RectAreaLight(0x8ea4d8, 1.1 * (k.window ?? 1), win.z1 - win.z0, win.y1 - win.y0);
+    L.window.position.set(x0 - 0.05, (win.y0 + win.y1) / 2, (win.z0 + win.z1) / 2);
+    L.window.lookAt(x0 + 1, (win.y0 + win.y1) / 2, (win.z0 + win.z1) / 2);
+  } else {
+    // dusk through the window: a broad, soft, unshadowed cool spot from outside
+    L.window = spot(0x8ea4d8, 6 * (k.window ?? 1), { pos: [x0 - 1.2, win.y1 + 0.2, (win.z0 + win.z1) / 2], target: [x0 + 2.0, 0.4, (win.z0 + win.z1) / 2 + 0.3], angle: 0.9, penumbra: 1, shadow: 0 });
+    st.scene.add(L.window.target);
+  }
+  const lb = H.anchors.lamp2Bulb;
+  L.corner = spot(0xffb36a, 9 * (k.corner ?? 1), { pos: [lb.x, lb.y, lb.z], target: [0.4, 0.9, -1.2], angle: 0.75, penumbra: 0.9, shadow: 2048, near: 0.1, far: 7, bias: -0.0005 });
+  L.corner.shadow.normalBias = 0.01;
+  st.scene.add(L.pendant, L.pendant.target, L.lamp, L.window, L.corner, L.corner.target);
   return L;
 }

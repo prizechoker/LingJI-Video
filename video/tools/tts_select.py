@@ -22,6 +22,7 @@ ap.add_argument("--takes", default="audio/takes")
 ap.add_argument("--out", default="audio")
 ap.add_argument("--force", default="", help="comma list UNIT=take overrides, e.g. U03=2")
 ap.add_argument("--reuse", action="store_true", help="skip scoring: reuse audio/takes_report.json and only re-assemble")
+ap.add_argument("--lead", type=float, default=1.4, help="seconds of picture before the first word")
 args = ap.parse_args()
 torch.set_num_threads(int(os.environ.get("SEL_THREADS", "3")))
 
@@ -118,7 +119,7 @@ import pyloudnorm as pyln  # noqa: E402
 
 SR = 24000
 meter = pyln.Meter(SR, block_size=0.2)
-track, units_out, t = [], [], 0.25
+track, units_out, t = [], [], args.lead
 track.append(np.zeros(int(SR * t), dtype=np.float32))
 for u in units:
     b = chosen[u["id"]]

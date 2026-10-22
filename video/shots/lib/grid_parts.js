@@ -29,7 +29,7 @@ export function flangeMaterials() {
   const hole = new THREE.MeshBasicMaterial({ color: 0x050607 });
   return {
     B: [new THREE.MeshPhysicalMaterial({ color: 0x1b1d21, metalness: 0.65, roughness: 0.34, clearcoat: 0.35, clearcoatRoughness: 0.3 }), hole],
-    W: [new THREE.MeshPhysicalMaterial({ color: 0xd4d9df, metalness: 1, roughness: 0.24 }), hole],
+    W: [new THREE.MeshPhysicalMaterial({ color: 0xe6eaee, metalness: 1, roughness: 0.42, envMapIntensity: 2.2 }), hole],
   };
 }
 

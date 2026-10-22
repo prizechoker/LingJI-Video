@@ -153,6 +153,12 @@ export async function create({ renderer, scale, p, cues, dur }) {
         const t0 = cues.lee ?? 0.5;
         callout(g, st.camera, V3(BOWL_W[0] - 0.01, TABLE.top + 0.12, BOWL_W[2] - 0.1), { text: '李世石', sub: '18 个世界冠军', a: sstep(t0, t0 + 0.7, t), side: -1, dx: 140, dy: -160, size: 42, color: [248, 234, 212], line: [236, 205, 160], subSize: 24 });
       }
+      if (mode === 'watch' && p.caption) {
+        const t0 = cues.aja ?? 0.8;
+        const a = sstep(t0, t0 + 0.7, t) * (1 - sstep(dur - 0.5, dur, t));
+        title(g, p.caption.name, 150, 700, { size: 58, a, spacing: 8, weight: 600, align: 'left' });
+        caption(g, 154, 770, { en: p.caption.en, zh: p.caption.role, a: a * 0.95, color: [214, 228, 244], zhSize: 26, rule: 120 });
+      }
       if (mode === 'machine') {
         const t0 = cues.alphago ?? 0.6;
         callout(g, st.camera, V3(0.46, 0.36, 0.32), { text: 'AlphaGo', sub: 'Google DeepMind', a: sstep(t0, t0 + 0.7, t), side: 1, dx: 160, dy: -130, size: 42, color: [216, 236, 255], line: [150, 200, 255], subSize: 22 });

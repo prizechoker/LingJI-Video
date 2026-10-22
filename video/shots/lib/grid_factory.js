@@ -11,7 +11,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { armFleet, armMaterials, solveArm } from './grid_arm.js';
 import { gridFloorMaterial, floorPlane } from './grid_floor.js';
-import { sparkField, arcCores, arcFlicker, hash, hazeCones } from './grid_fx.js';
+import { sparkField, arcCores, arcFlicker, hash, hazeCones, arcGlow } from './grid_fx.js';
 import { ss, clamp, lerp } from './kit.js';
 
 export const G = [1.0, 1.068];
@@ -81,8 +81,8 @@ function columnGeometry() {
 function fixtureGeometry() { return merge([box(0.3, 0.09, 1.5, 0, 0.045, 0), box(0.01, 1.4, 0.01, 0, 0.75, -0.6), box(0.01, 1.4, 0.01, 0, 0.75, 0.6)]); }
 function cabinetGeometry() { return merge([box(0.8, 1.6, 0.45, 0, 0.8 + 0.1, 0, 0.01), box(0.75, 0.1, 0.4, 0, 0.05, 0), box(0.02, 0.2, 0.02, 0.3, 1.0, 0.235)]); }
 function drumGeometry() {
-  const g = new THREE.CylinderGeometry(0.29, 0.29, 0.85, 32).translate(0, 0.425, 0);
-  const lid = new THREE.CylinderGeometry(0.2, 0.3, 0.12, 32).translate(0, 0.91, 0);
+  const g = new THREE.CylinderGeometry(0.25, 0.25, 0.75, 32).translate(0, 0.375, 0);
+  const lid = new THREE.CylinderGeometry(0.16, 0.26, 0.1, 32).translate(0, 0.8, 0);
   return merge([g, lid]);
 }
 
@@ -136,15 +136,15 @@ function handleProgram(A0, B0, period, phase) {
 // opts: blocks: (row, j) -> 'weld' | 'handle' | null ; zRange: [jMin, jMax] ; floor overrides
 export async function buildFactory(st, {
   jRange = [-9, 2], rows = ROWS, block = (r, j) => ((j + r * 2) % 4 === 3 ? 'handle' : 'weld'),
-  floor: floorOpts = {}, fixtures = true, sparksMax = 2600, maxSparkArms = 14, armPaint = 0xd3d8de, hazeI = 0.035, lodDist = 22,
+  floor: floorOpts = {}, fixtures = true, sparksMax = 2600, maxSparkArms = 14, armPaint = 0xd3d8de, hazeI = 0.035, lodDist = 22, glowPower = 3.5,
 } = {}) {
   const group = new THREE.Group();
   // floor
   const fl = gridFloorMaterial(st, {
     texture: 'Concrete047A', tile: 5, tint: 0xb4bec7, cell: G, lineW: 0.05, paint: 0x22262b, paintA: 0.9, wear: 0.3, texMix: 0.5, texMean: 0xa4a197,
-    pools: { pitch: [4.75, 4.272], offset: [0, 0], radius: [1.5, 1.9], color: 0xe4efff, intensity: 0.0, rect: [-34, -76, 34, 20] },
+    pools: { pitch: [4.75, 4.272], offset: [0, 0], radius: [2.0, 2.4], color: 0xe4efff, intensity: 0.0, rect: [-34, -76, 34, 20] },
     refl: { intensity: 0.0, height: 12, pitch: [4.75, 4.272], offset: [0, 0], half: [0.11, 0.69], blur: 0.022 },
-    clearcoat: 0, roughness: 0.8, normalScale: 0.5, ...floorOpts,
+    clearcoat: 0, roughness: 0.62, normalScale: 0.5, ...floorOpts,
   });
   const floor = new THREE.Mesh(floorPlane(160, 200, 0, -50), fl);
   floor.receiveShadow = true;
@@ -164,11 +164,11 @@ export async function buildFactory(st, {
   const steel = new THREE.MeshStandardMaterial({ color: 0x5d636b, metalness: 0.6, roughness: 0.45 });
   const darkPaint = new THREE.MeshStandardMaterial({ color: 0x2b3036, roughness: 0.55, metalness: 0.2 });
   const fenceMat = new THREE.MeshStandardMaterial({ color: 0x6b737c, roughness: 0.5, metalness: 0.4 });
-  const meshMat = new THREE.MeshStandardMaterial({ color: 0x4a5058, roughness: 0.5, metalness: 0.5, alphaMap: meshTexture(), transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
+  const meshMat = new THREE.MeshStandardMaterial({ color: 0x4a5058, roughness: 0.5, metalness: 0.5, alphaMap: meshTexture(), transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide });
   meshMat.alphaMap.repeat.set(20, 34);
   const partMat = new THREE.MeshStandardMaterial({ color: 0x8a9097, metalness: 0.85, roughness: 0.38 });
   const cabMat = new THREE.MeshStandardMaterial({ color: 0x3b434c, roughness: 0.45 });
-  const drumMat = new THREE.MeshStandardMaterial({ color: 0x3d5a78, roughness: 0.4 });
+  const drumMat = new THREE.MeshStandardMaterial({ color: 0x3a4a5a, roughness: 0.45 });
   const colMat = new THREE.MeshStandardMaterial({ color: 0x56636f, roughness: 0.55, metalness: 0.3 });
 
   const inst = (geo, mat, n, shadow = true) => {
@@ -224,8 +224,9 @@ export async function buildFactory(st, {
   // cabinets (one per cell, outside the fence on the aisle side) and wire drums (one per welding robot)
   const cab = inst(cabinetGeometry(), cabMat, cells.length);
   cells.forEach((c, i) => {
-    const x = (c.aisleSide < 0 ? c.x0 : c.x1) * G[0] + c.aisleSide * 0.32;
-    place(cab, i, x, 0, (c.z0 + 0.8) * G[1], c.aisleSide < 0 ? -Math.PI / 2 : Math.PI / 2);
+    // the controller cabinet stands outside the fence on the far side from the aisle
+    const x = (c.aisleSide < 0 ? c.x1 : c.x0) * G[0] - c.aisleSide * 0.32;
+    place(cab, i, x, 0, (c.z0 + 1.5) * G[1], c.aisleSide < 0 ? Math.PI / 2 : -Math.PI / 2);
   });
 
   // robots
@@ -259,6 +260,9 @@ export async function buildFactory(st, {
 
   const fleet = armFleet(arms, { mats: armMaterials({ paint: armPaint }) });
   group.add(fleet.group);
+  // the arcs' light on everything near them
+  const glow = arcGlow(12, { power: glowPower });
+  for (const m of [fl, steel, fenceMat, partMat, cabMat, drumMat, ...fleet.mats]) glow.add(m);
   const pitchW = 0.28; // torch flange pitch while welding (nozzle ~ 70 deg down)
 
   // building columns between blocks, every third gap
@@ -275,8 +279,8 @@ export async function buildFactory(st, {
   const FIX_H = 12;
   const housing = inst(fixtureGeometry(), darkPaint, fxPos.length, false);
   const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xeaf3ff).multiplyScalar(6), toneMapped: false });
-  const glow = inst(new THREE.BoxGeometry(0.22, 0.01, 1.38).translate(0, -0.002, 0), glowMat, fxPos.length, false);
-  fxPos.forEach(([x, z], i) => { place(housing, i, x, FIX_H, z); place(glow, i, x, FIX_H, z); });
+  const diffuser = inst(new THREE.BoxGeometry(0.22, 0.01, 1.38).translate(0, -0.002, 0), glowMat, fxPos.length, false);
+  fxPos.forEach(([x, z], i) => { place(housing, i, x, FIX_H, z); place(diffuser, i, x, FIX_H, z); });
   const haze = hazeCones(fxPos.map(([x, z]) => [x, FIX_H - 0.05, z]), { height: FIX_H, radius: 2.6, intensity: hazeI });
   if (hazeI > 0) group.add(haze);
 
@@ -291,7 +295,7 @@ export async function buildFactory(st, {
   const state = { t: 0 };
 
   return {
-    group, floor, floorMat: fl, haze, fleet, arms, cells, sparks, cores, fixtures: fxPos, FIX_H, glowMat,
+    group, floor, floorMat: fl, haze, glow, fleet, arms, cells, sparks, cores, fixtures: fxPos, FIX_H, glowMat,
     // pose every robot for time t; sparks for the welding arms nearest `focus` (a world point)
     update(t, camera, { focus = null, sparkGain = 1, arcGain = 1, weldBoost = null } = {}) {
       state.t = t;
@@ -323,6 +327,7 @@ export async function buildFactory(st, {
       welding.sort((A, B) => fleet.tips[A.i].distanceToSquared(f) - fleet.tips[B.i].distanceToSquared(f));
       const coreList = welding.map(({ i, w }) => ({ p: fleet.tips[i], k: w * arcFlicker(t, i) * arcGain, size: 1 }));
       cores.userData.set(coreList);
+      glow.set(coreList.map((c) => ({ p: c.p.clone().add(new THREE.Vector3(0, 0.08, 0)), k: c.k })));
       const emitters = [];
       for (const { i } of tipList.slice().sort((A, B) => fleet.tips[A.i].distanceToSquared(f) - fleet.tips[B.i].distanceToSquared(f)).slice(0, maxSparkArms)) {
         const prog = programs[i].f;

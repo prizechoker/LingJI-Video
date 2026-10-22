@@ -21,7 +21,7 @@ export function drawSubtitles(pen, t, subs) {
   let k = -1;
   for (let i = 0; i < subs.length; i++) if (subs[i].start - LEAD <= t) k = i;
   const ui = pen.ui;
-  const b = backdrop(t, subs, k);
+  const b = subs[k] && subs[k].style === 'quote' ? 0 : backdrop(t, subs, k);
   if (b > 0.001) {
     ui.save();
     ui.globalAlpha = 0.5 * b;
@@ -41,6 +41,22 @@ export function drawSubtitles(pen, t, subs) {
   if (next) a *= 1 - smoothstep(next.start - LEAD - 0.06, next.start - LEAD, t);
   if (a <= 0.001) return;
   const segs = s.segs.map((g) => ({ t: g.t, c: g.c ? COLORS[g.c] || g.c : null }));
+  if (s.style === 'quote') {
+    // a quotation: set large in the middle of the frame, slower in and out, over a soft shadow
+    const aq = smoothstep(tIn - 0.1, tIn + 0.45, t) * (1 - smoothstep(s.end + 0.05, s.end + 0.5, t)) * (next ? 1 - smoothstep(next.start - LEAD - 0.15, next.start - LEAD, t) : 1);
+    if (aq <= 0.001) return;
+    ui.save();
+    ui.globalAlpha = 0.55 * aq;
+    const sh = ui.createRadialGradient(960, 540, 60, 960, 540, 760);
+    sh.addColorStop(0, 'rgba(0,0,0,0.6)');
+    sh.addColorStop(1, 'rgba(0,0,0,0)');
+    ui.fillStyle = sh;
+    ui.fillRect(0, 140, 1920, 800);
+    ui.restore();
+    const lift = (1 - smoothstep(tIn - 0.1, tIn + 0.6, t)) * 10;
+    richText(ui, segs, 960, 540 + lift, { size: 60, weight: 600, a: aq, spacing: 5, color: [246, 240, 230], shadow: 30, shadowColor: 'rgba(0,0,0,0.9)' });
+    return;
+  }
   const rise = (1 - smoothstep(tIn, tIn + 0.25, t)) * 5;
   richText(ui, segs, 960, 968 + rise, { size: 46, weight: 600, a, spacing: 2, color: [244, 239, 231], shadow: 14, shadowColor: 'rgba(0,0,0,0.85)' });
 }

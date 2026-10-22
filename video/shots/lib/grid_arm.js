@@ -146,10 +146,11 @@ function buildParts(hi = true) {
   // elbow (J3): hub, the rear housing with the three wrist motors; the forearm starts here
   P.elbow = part([
     [hub(0.135, 0.28, 'z', 0, 0, 0, 0.015), 0],
-    [rbox(0.38, 0.27, 0.26, 0.06, 0.0, ARM.a3 * 0.6, 0, 3), 0],
+    [rbox(0.4, 0.27, 0.26, 0.07, -0.02, ARM.a3 * 0.6, 0, 3), 0],
     [cyl(0.105, 0.095, 0.08, 'x', 40, 0.2, ARM.a3, 0), 0],
-    ...[-0.06, 0, 0.06].map((z, k) => [cyl(0.034, 0.034, 0.13, 'x', 24, -0.24, ARM.a3 + (k === 1 ? 0.05 : -0.02), z), 1]),
-    ...[-0.06, 0, 0.06].map((z, k) => [hub(0.036, 0.02, 'x', -0.31, ARM.a3 + (k === 1 ? 0.05 : -0.02), z, 0.005), 0]),
+    // the wrist motors in one housing at the back, a dark cover plate
+    [rbox(0.2, 0.2, 0.2, 0.05, -0.27, ARM.a3 + 0.01, 0, 3), 1],
+    [rbox(0.03, 0.17, 0.17, 0.012, -0.375, ARM.a3 + 0.01, 0, 2), 0],
     [hub(0.07, 0.03, 'z', 0, 0, 0.15, 0.008), 2],
   ]);
   // forearm (J4 roll): a tapered tube to the wrist

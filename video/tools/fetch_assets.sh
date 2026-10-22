@@ -22,5 +22,24 @@ done
 mkdir -p assets/hbm
 curl -fsSL -o "$tmp/hbm.zip" "https://download.blender.org/demo/asset-bundles/human-base-meshes/human-base-meshes-bundle-v1.4.1.zip"
 unzip -q -o -j "$tmp/hbm.zip" "*human_base_meshes_bundle.blend" -d assets/hbm
+# archive shots (shots/cart.js, shots/unimate.js): a 1970s lab and an old machine shop (reflections), painted block wall,
+# factory concrete, worn and brushed steel
+for h in vintage_measuring_lab machine_shop_02; do
+  curl -fsSL -o "assets/hdri/${h}_2k.hdr" "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/${h}_2k.hdr"
+done
+for m in PaintedBricks003 Concrete048 Metal055A Metal032; do
+  curl -fsSL -o "$tmp/$m.zip" "https://ambientcg.com/get?file=${m}_2K-JPG.zip"
+  unzip -q -o "$tmp/$m.zip" -d "$tmp/$m"
+  for k in Color NormalGL Roughness; do cp "$tmp/$m/${m}_2K-JPG_$k.jpg" "assets/textures/${m}_$k.jpg"; done
+  rm -rf "$tmp/$m" "$tmp/$m.zip"
+done
+# the grid chapter (shots/factory_grid, warehouse, vacuum, dishwasher, grids): factory/warehouse floor, a living room
+curl -fsSL -o "assets/hdri/empty_warehouse_01_2k.hdr" "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/empty_warehouse_01_2k.hdr"
+for m in Concrete047A WoodFloor051 Carpet012; do
+  curl -fsSL -o "$tmp/$m.zip" "https://ambientcg.com/get?file=${m}_2K-JPG.zip"
+  unzip -q -o "$tmp/$m.zip" -d "$tmp/$m"
+  for k in Color NormalGL Roughness; do cp "$tmp/$m/${m}_2K-JPG_$k.jpg" "assets/textures/${m}_$k.jpg"; done
+  rm -rf "$tmp/$m" "$tmp/$m.zip"
+done
 rm -rf "$tmp"
 echo "assets ready"

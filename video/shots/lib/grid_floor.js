@@ -151,13 +151,15 @@ diffuseColor.rgb *= 1.0 + uBlotch * (gfFbm(vGW.xz * 0.11 + 3.7) - 0.47);
   float gHalf = (uGoN - 1.0) * 0.5;
   vec2 gd = abs(fract(g + 0.5) - 0.5) * uGoCell;
   vec2 inside = step(abs(g), vec2(gHalf + 0.5));
-  float reach = uGoDraw * (gHalf + 0.02);
-  // a line along z (constant x) is drawn while |g.y| < reach, and only within the board's columns
-  float gx = gfLine(gd.x, uGoW, fw.x) * step(abs(g.x), gHalf + 0.02) * (1.0 - smoothstep(reach - 0.02, reach + 0.02, abs(g.y)));
-  float gz = gfLine(gd.y, uGoW, fw.y) * step(abs(g.y), gHalf + 0.02) * (1.0 - smoothstep(reach - 0.02, reach + 0.02, abs(g.x)));
+  // the fine grid spreads out from the centre as an expanding square with a soft front
+  float reach = uGoDraw * (gHalf + 1.5);
+  float rev = 1.0 - smoothstep(reach - 1.2, reach, max(abs(g.x), abs(g.y)));
+  float inB = step(abs(g.x), gHalf + 0.02) * step(abs(g.y), gHalf + 0.02);
+  float gx = gfLine(gd.x, uGoW, fw.x) * inB * rev;
+  float gz = gfLine(gd.y, uGoW, fw.y) * inB * rev;
   // the border lines a little heavier
-  float bx = gfLine(abs(abs(g.x) - gHalf) * uGoCell.x, uGoW * 1.6, fw.x) * step(abs(g.y), gHalf + 0.02) * (1.0 - smoothstep(reach - 0.02, reach + 0.02, abs(g.y)));
-  float bz = gfLine(abs(abs(g.y) - gHalf) * uGoCell.y, uGoW * 1.6, fw.y) * step(abs(g.x), gHalf + 0.02) * (1.0 - smoothstep(reach - 0.02, reach + 0.02, abs(g.x)));
+  float bx = gfLine(abs(abs(g.x) - gHalf) * uGoCell.x, uGoW * 1.6, fw.x) * step(abs(g.y), gHalf + 0.02) * rev;
+  float bz = gfLine(abs(abs(g.y) - gHalf) * uGoCell.y, uGoW * 1.6, fw.y) * step(abs(g.x), gHalf + 0.02) * rev;
   float go = max(max(gx, gz), max(bx, bz));
   // star points (hoshi) at 3, 9, 15 for a 19 board
   vec2 sp = g + gHalf;
@@ -167,7 +169,7 @@ diffuseColor.rgb *= 1.0 + uBlotch * (gfFbm(vGW.xz * 0.11 + 3.7) - 0.47);
   go = max(go, isStar * uGoStar * (1.0 - smoothstep(uGoW * 2.2 - f1, uGoW * 2.2 + f1, sr)));
   go = mix(go, clamp(uGoW / min(uGoCell.x, uGoCell.y) * 1.6, 0.0, 1.0) * step(abs(g.x), gHalf) * step(abs(g.y), gHalf) * uGoDraw, smoothstep(0.35, 1.2, f1 / uGoW));
   float inBoard = inside.x * inside.y;
-  base *= uBaseA * (1.0 - uGoOut * (1.0 - inBoard) * 0.85);
+  base *= uBaseA * (1.0 - uGoOut * (1.0 - inBoard) * 0.55);
   // lanes
   float lane = 0.0;
   for (int k = 0; k < 8; k++) {
