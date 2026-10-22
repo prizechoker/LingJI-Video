@@ -309,14 +309,27 @@ function glazeTexture(glaze, rimV, seed) {
 const BOWL_CACHE = new Map();
 export function bowl(studio, kind = 'rice', { seed = 3 } = {}) {
   if (kind === 'rice') {
-    const m = new THREE.Mesh(bowlGeometry(), porcelainMaterial());
+    // the film's rice bowl, re-turned with a lighter mesh (the same profile, every third point, 80 segments)
+    let e = BOWL_CACHE.get('rice');
+    if (!e || e.studio !== studio) {
+      const full = bowlGeometry();
+      const pos = full.attributes.position;
+      const n = full.userData.inner ? Math.round(pos.count / 161) : 221;
+      const prof = [];
+      for (let i = 0; i < n; i += 3) prof.push([Math.hypot(pos.getX(i), pos.getZ(i)), pos.getY(i)]);
+      if ((n - 1) % 3) prof.push([Math.hypot(pos.getX(n - 1), pos.getZ(n - 1)), pos.getY(n - 1)]);
+      const geo = arcLathe(prof, 80);
+      e = { studio, geo, mat: porcelainMaterial() };
+      BOWL_CACHE.set('rice', e);
+    }
+    const m = new THREE.Mesh(e.geo, e.mat);
     m.castShadow = m.receiveShadow = true;
     return m;
   }
   const B = BOWLS[kind];
   let entry = BOWL_CACHE.get(kind);
   if (!entry || entry.studio !== studio) {
-    const geo = arcLathe(smoothProfile(B.prof, 160), 128);
+    const geo = arcLathe(smoothProfile(B.prof, 90), 72);
     let mat;
     if (B.glaze.wood) {
       const w = studio.pbr('Wood026', { repeat: [2, 1] });

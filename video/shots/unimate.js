@@ -16,9 +16,9 @@ import { ss, sstep, clamp, lerp, easeOut, easeIn, breathe, grade, caption, text,
 import { factoryMaterials, buildUnimate, buildDieCaster, buildQuench, buildHall, castingGeometry, smokeSystem, reach, DIE, UNI } from './lib/archive_factory.js';
 
 const CAMS = {
-  work: { pos: [-2.4, 1.95, 4.6], to: [-1.8, 1.72, 3.6], look: [0.3, 1.1, 0.7], lookTo: [-0.05, 1.3, 1.2], fov: 34 },
-  blind: { pos: [1.42, 1.36, 1.02], to: [1.3, 1.32, 0.94], look: [0.66, 1.22, 0.62], lookTo: [0.66, 1.22, 0.6], fov: 30 },
-  repeat: { pos: [2.05, 1.85, 1.75], to: [1.95, 1.8, 1.62], look: [0.6, 1.2, 0.25], lookTo: [0.6, 1.2, 0.22], fov: 32 },
+  work: { pos: [-3.2, 2.25, 5.5], to: [-1.65, 1.62, 3.15], look: [0.35, 1.05, 0.7], lookTo: [-0.45, 1.36, 1.5], fov: 34, fovTo: 31 },
+  blind: { pos: [0.36, 1.37, -0.06], to: [0.39, 1.35, 0.03], look: [0.7, 1.25, 0.62], lookTo: [0.69, 1.25, 0.6], fov: 36 },
+  repeat: { pos: [-0.38, 2.7, 0.24], to: [-0.36, 2.66, 0.22], look: [0.7, 1.12, 0.06], lookTo: [0.7, 1.12, 0.06], fov: 27 },
 };
 
 // the casting's grasp point (on the moving die, ejected) — the one place every part appears
@@ -48,7 +48,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
   uni.group.position.copy(UNI.at);
   st.scene.add(uni.group);
   const quench = buildQuench(mats).build(mats);
-  quench.position.set(-0.62, 0, 1.42);
+  quench.position.set(2.15, 0, 1.25);
   st.scene.add(quench);
 
   // the casting (and, for 'repeat', copies of it from earlier cycles)
@@ -60,13 +60,14 @@ export async function create({ renderer, scale, p, dur, cues }) {
 
   // lights: a cool overhead key on the cell, a cold back light from the high windows, the hot part's glow
   const keyI = p.key ?? 230;
-  const key = spot(0xc6d6ff, keyI, { pos: [1.2, 6.8, 2.2], target: [0.8, 1.0, 1.0], angle: 0.42, penumbra: 0.9, shadow: 2048, radius: 5, far: 14, bias: -0.0004 });
+  const key = spot(0xc6d6ff, keyI, { pos: [1.2, 6.8, 2.2], target: [0.6, 1.0, 1.2], angle: 0.3, penumbra: 0.9, shadow: 2048, radius: 5, far: 14, bias: -0.0004 });
   const rimI = p.rim ?? 160;
   const rim = spot(0xaec6e8, rimI, { pos: [-2.5, 7.2, -8.0], target: [0.8, 1.2, 1.2], angle: 0.2, penumbra: 0.8, shadow: 1024, radius: 3, far: 20, near: 2 });
   const glow = new THREE.PointLight(0xff7a2a, 0, 5, 2);
   const glow2 = new THREE.PointLight(0xff6a20, 0, 3, 2); // the shot sleeve's pour hole
   glow2.position.set(-0.6, DIE.y - 0.05, 0.3);
   const hemi = new THREE.HemisphereLight(0x6f8090, 0x1c1a18, p.fill ?? 0.12);
+  if (mode === 'blind') key.castShadow = false; // too close for its shadow map: let AO do the contact shading
   st.scene.add(key, key.target, rim, rim.target, glow, glow2, hemi);
 
   // smoke and steam
@@ -75,7 +76,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
 
   grade(st, {
     ao: { radius: 0.25, intensity: 1.5, falloff: 1.0 },
-    dof: mode === 'blind' ? { distance: 0.9, range: 0.35, bokeh: 5 } : mode === 'work' ? { distance: 3.5, range: 3.0, bokeh: 3 } : { distance: 2.0, range: 1.6, bokeh: 3 },
+    dof: mode === 'blind' ? { distance: 0.7, range: 0.3, bokeh: 6 } : mode === 'work' ? { distance: 3.5, range: 3.0, bokeh: 3 } : { distance: 2.0, range: 0.7, bokeh: 4 },
     bloom: { intensity: 0.6, threshold: 0.8, radius: 0.8 },
     vignette: 0.5, contrast: 0.1, saturation: -0.05, exposure: p.exposure ?? 1.0,
   });
@@ -83,7 +84,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
   // ---------------------------------------------------------------- one machine cycle, as a function of time
   // ev: { open, grip, hot } (absolute times); returns poses for the arm, the die, the casting
   const HOME = { swing: 0.55, pitch: 0.1, ext: 0.02, bend: -0.1, swivel: 0, grip: 0 };
-  const AWAY = { swing: 0.95, pitch: 0.18, ext: 0.15, bend: -0.05, swivel: -0.12, grip: 1 };
+  const AWAY = { swing: 1.3, pitch: 0.15, ext: 0.22, bend: 0.12, swivel: -0.8, grip: 1 };
   const AT = reach(PICK);
   const OUT = { ...AT, ext: 0.02 };
   const mix = (a, b, u) => {
@@ -108,8 +109,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     const open = DIE.open * ss(clamp((t - c.open) / c.openDur)) * (1 - ss(clamp((t - c.close) / c.openDur)));
     const eject = DIE.eject * ss(clamp((t - c.open - c.openDur) / (c.openDur * 0.3)));
     const held = t >= c.grip + c.gripDur * 0.5;
-    const shown = t >= c.open - 0.01 || true;
-    return { pose, open, eject, held, shown, heat: clamp(1 - Math.max(0, t - c.open) / 14) };
+    return { pose, open, eject, held, heat: clamp(1 - Math.max(0, t - c.open) / 40) };
   };
   const castInDie = (open, eject) => new THREE.Matrix4().makeTranslation(open - DIE.open + PICK.x + DIE.eject - eject, PICK.y, PICK.z);
 
@@ -119,7 +119,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     const k = clamp(h);
     hotColor.setRGB(1, lerp(0.1, 0.3, k ** 1.5), lerp(0.005, 0.04, k ** 2));
     m.emissive.copy(hotColor);
-    m.emissiveIntensity = (p.heat ?? 9) * k ** 1.6;
+    m.emissiveIntensity = (p.heat ?? 2.8) * k ** 1.6;
   };
 
   // ---------------------------------------------------------------- per-mode timing
@@ -136,70 +136,92 @@ export async function create({ renderer, scale, p, dur, cues }) {
   // repeat: cycle n starts at T(n); durations shrink geometrically after cue "each"
   const tEach = cues.each ?? dur * 0.3;
   const tSame = cues.same ?? dur * 0.62;
-  const C0 = Math.max(1.2, tEach); // the first cycle, at a readable pace, fills the time before "each"
-  const ratio = 0.62;
-  const nCycles = 14;
-  const starts = [0];
+  // the first cycle at a readable pace fills the time before "each"; then they come faster and faster
+  const starts = [-0.45];
   {
-    let d = C0;
-    for (let n = 1; n < nCycles; n++) {
-      starts.push(starts[n - 1] + d);
-      d = Math.max(0.16, d * ratio);
+    let d = Math.max(1.4, tEach + 0.45);
+    while (starts[starts.length - 1] < dur + 1) {
+      starts.push(starts[starts.length - 1] + d);
+      d = Math.max(0.2, d * 0.6);
     }
   }
-  const cycleAt = (n) => {
-    const t0 = starts[n] - (n === 0 ? 0.35 : 0), d = (n + 1 < starts.length ? starts[n + 1] : starts[n] + 0.16) - starts[n];
-    const s = (x) => t0 + x * d;
-    // the die is open at the cycle start: the part is there; the arm comes in, takes it, goes; the die cycles
-    return {
-      open: s(-0.25), openDur: d * 0.18,
-      swingIn: [s(0.0), s(0.22)], extIn: [s(0.2), s(0.4)], grip: s(0.42), gripDur: d * 0.06,
-      pull: [s(0.5), s(0.64)], swingOut: [s(0.62), s(0.86)], close: s(0.7),
-    };
-  };
   const cycleIndex = (t) => {
     let n = 0;
     while (n + 1 < starts.length && t >= starts[n + 1]) n++;
     return n;
+  };
+  // a repeat cycle by phase: the die stays open; each new casting is pushed out of the die face at the same place
+  // (u 0..0.1), the arm comes in and takes it (grip at u 0.47) and carries it away out of frame
+  const SIDE = { ...HOME, swing: -0.6, pitch: 0.12 };
+  const repeatState = (t) => {
+    const n = cycleIndex(t), d = starts[n + 1] - starts[n], u = (t - starts[n]) / d;
+    let pose = mix(SIDE, OUT, ss(clamp((u - 0.04) / 0.26)));
+    pose = mix(pose, AT, easeOut(clamp((u - 0.28) / 0.17), 2.2));
+    pose.grip = ss(clamp((u - 0.45) / 0.05));
+    pose = mix(pose, { ...OUT, grip: 1 }, ss(clamp((u - 0.55) / 0.13)));
+    pose = mix(pose, { ...SIDE, grip: 1 }, ss(clamp((u - 0.66) / 0.26)));
+    pose.grip = clamp(pose.grip) * (1 - ss(clamp((u - 0.93) / 0.05)));
+    const held = u >= 0.48 && u < 0.93;
+    const present = u < 0.48;
+    const eject = DIE.eject * ss(clamp(u / 0.09));
+    return { pose, open: DIE.open, eject: n === 0 ? DIE.eject : eject, held, present, gone: u >= 0.93, heat: n === 0 ? 1 : clamp(0.6 + u * 4), n, u, d };
   };
 
   // ghosts for 'repeat': additive copies of the moving arm and of the casting
   const ghosts = [];
   const ghostCasts = [];
   if (mode === 'repeat') {
+    // a ghost is a clean translucent solid: a depth-only pre-pass, then its colour blended once over the frame
+    const pre = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, transparent: true });
+    var ghostHot = mats.hot.clone();
+    ghostHot.emissive.setRGB(1, 0.25, 0.03);
+    ghostHot.emissiveIntensity = 3;
+    const cache = new Map();
     const ghostMat = (m) => {
+      if (cache.has(m)) return cache.get(m);
       const g = m.clone();
       g.transparent = true;
       g.depthWrite = false;
-      g.blending = THREE.AdditiveBlending;
-      g.opacity = 0.25;
+      g.opacity = 0.2;
+      cache.set(m, g);
       return g;
     };
-    const cache = new Map();
-    for (let k = 0; k < 7; k++) {
+    const ghostify = (grp) => {
+      const meshes = [];
+      grp.traverse((o) => { if (o.isMesh) meshes.push(o); });
+      for (const o of meshes) {
+        o.castShadow = o.receiveShadow = false;
+        o.material = ghostMat(o.material);
+        o.renderOrder = 2;
+        const d = new THREE.Mesh(o.geometry, pre);
+        d.renderOrder = 1;
+        o.add(d);
+      }
+    };
+    for (let k = 0; k < 5; k++) {
       const arm = buildUnimate(st, mats);
       arm.group.position.copy(UNI.at);
-      arm.group.traverse((o) => {
-        if (!o.isMesh) return;
-        o.castShadow = false;
-        o.receiveShadow = false;
-        if (!cache.has(o.material)) cache.set(o.material, ghostMat(o.material));
-        o.material = cache.get(o.material);
-      });
-      // only the moving arm shows as a ghost: hide the cabinet
-      arm.group.children[0].visible = false;
+      arm.group.children[0].visible = false; // the cabinet stays solid; only the moving arm leaves ghosts
+      ghostify(arm.group);
       st.scene.add(arm.group);
       ghosts.push(arm);
-      const gc = castP.build({ hot: ghostMat(mats.hot) });
+      const gc = castP.build({ hot: ghostHot });
+      ghostify(gc);
       gc.matrixAutoUpdate = false;
       st.scene.add(gc);
       ghostCasts.push(gc);
     }
   }
 
+  const ghostMats = [];
+  for (const gh of ghosts) gh.group.traverse((o) => { if (o.isMesh && o.material.transparent && o.material.colorWrite !== false && !ghostMats.includes(o.material)) ghostMats.push(o.material); });
+  for (const gc of ghostCasts) gc.traverse((o) => { if (o.isMesh && o.material.colorWrite !== false && !ghostMats.includes(o.material)) ghostMats.push(o.material); });
   const cam = p.cam || CAMS[mode];
-  const tmpM = new THREE.Matrix4();
   const pickScreen = { x: 0, y: 0 };
+  let ghostAmt = 0;
+  const halo = { x: 0, y: 0, r: 0, a: 0 };
+  const ray = new THREE.Raycaster();
+  const occluders = [dc.group, uni.group];
 
   const puffs = [];
   {
@@ -219,19 +241,9 @@ export async function create({ renderer, scale, p, dur, cues }) {
     } else if (mode === 'blind') {
       burst(-2, 14, [0.4, DIE.y + 0.1, 0.2], [0.5, 0.4, 0.4], [0.5, 0.55, 0.6], 0.2, 0.25);
     } else {
-      for (let n = 0; n < nCycles; n++) {
-        const c = cycleAt(n);
-        burst(c.open + 0.05, n < 3 ? 4 : 1, [0.35, DIE.y + 0.1, 0.25], [0.5, 0.4, 0.4], [0.6, 0.64, 0.68], 0.22);
-      }
+      for (let n = 1; n < starts.length; n++) burst(starts[n] + 0.02, n < 4 ? 3 : 1, [PICK.x + 0.05, PICK.y + 0.05, PICK.z - 0.1], [0.1, 0.1, 0.2], [0.6, 0.64, 0.68], 0.16, 0.25);
     }
   }
-  const wisp = (t, pos, heat) => {
-    // thin smoke rising from the hot part: a ring buffer of puffs keyed to absolute time, spawned at the part's
-    // position at their birth (computed by the caller through posAt)
-    void t; void pos; void heat;
-  };
-  void wisp;
-
   return {
     studio: st,
     update(t) {
@@ -240,13 +252,10 @@ export async function create({ renderer, scale, p, dur, cues }) {
         state = cycle(t, workCycle);
       } else if (mode === 'blind') {
         // waiting at the open die, empty-handed, the casting glowing behind (a slow breath of the hydraulics)
-        const pose = mix(OUT, AT, 0.18);
-        pose.ext += 0.004 * Math.sin(t * 1.3);
-        pose.grip = 0;
+        const pose = { ...AT, ext: AT.ext - lerp(0.42, 0.3, ss(clamp(t / dur))) + 0.003 * Math.sin(t * 1.3), grip: 0 };
         state = { pose, open: DIE.open, eject: DIE.eject, held: false, heat: 0.9 };
       } else {
-        const n = cycleIndex(t);
-        state = cycle(t, cycleAt(n));
+        state = repeatState(t);
       }
       uni.pose(state.pose);
       dc.setOpen(state.open);
@@ -254,36 +263,34 @@ export async function create({ renderer, scale, p, dur, cues }) {
       // the casting: in the die until the fingers close, then in the hand
       if (state.held) casting.matrix.copy(uni.graspMatrix());
       else casting.matrix.copy(castInDie(state.open, state.eject));
+      casting.visible = !state.gone;
       casting.matrixWorldNeedsUpdate = true;
       setHeat(mats.hot, state.heat);
-      glow.position.setFromMatrixPosition(casting.matrix);
-      glow.position.y += 0.05;
+      glow.position.setFromMatrixPosition(casting.matrix).add(V3(-0.04, 0.02, -0.13).applyMatrix4(new THREE.Matrix4().extractRotation(casting.matrix)));
+      if (!state.held) glow.position.x -= 0.12;
       glow.intensity = (p.glow ?? 2.2) * state.heat ** 1.6 * (state.open > 0.05 || state.held ? 1 : 0.15);
-      glow2.intensity = 0.4 + 0.1 * Math.sin(t * 7.3) * Math.sin(t * 3.1);
+      glow2.intensity = mode === 'work' ? 0.4 + 0.1 * Math.sin(t * 7.3) * Math.sin(t * 3.1) : 0;
+      halo.a = state.heat ** 1.6 * (state.held ? 1 : sstep(0.1, DIE.open, state.open));
+      halo.p = V3().setFromMatrixPosition(casting.matrix).add(V3(0, 0.02, -0.13).applyMatrix4(new THREE.Matrix4().extractRotation(casting.matrix)));
 
-      // ghosts: earlier cycles (repeat), each a fixed fraction of its own cycle behind the live one
+      // ghosts: earlier cycles (repeat). Each ghost arm trails the live one by a fraction of a cycle (a strobe of its
+      // motion); the ghost parts sit at the pick point, where every cycle's part appeared — in perfect register.
       if (mode === 'repeat') {
         const n = cycleIndex(t);
-        const amt = sstep(tEach - 0.2, tEach + 0.6, t);
+        const amt = sstep(tEach - 0.1, tEach + 0.5, t);
+        ghostAmt = amt;
+        const d = starts[n + 1] - starts[n];
         for (let k = 0; k < ghosts.length; k++) {
-          const lag = (k + 1) * 0.11;
-          const nn = n, c = cycleAt(nn);
-          const d = (nn + 1 < starts.length ? starts[nn + 1] : starts[nn] + 0.16) - starts[nn];
-          const tg = t - lag * d;
-          const cg = tg < starts[nn] && nn > 0 ? cycleAt(nn - 1) : c;
-          const sg = cycle(tg, cg);
+          const sg = repeatState(t - (k + 1) * 0.075 * d);
           ghosts[k].pose(sg.pose);
           ghosts[k].group.visible = amt > 0.01;
-          ghosts[k].group.updateMatrixWorld(true);
-          const op = 0.22 * amt * (1 - k / ghosts.length);
-          ghosts[k].group.traverse((o) => { if (o.isMesh) o.material.opacity = 0.16 * amt; });
-          // the part copies: every cycle's casting, held where it was taken, in register
+          ghosts[k].pitchG.children.forEach((c) => { if (c.type === 'Group' && c !== ghosts[k].extG && c.children.length && c.children[0].material === mats.hose) c.visible = false; });
           const gc = ghostCasts[k];
-          gc.visible = amt > 0.01 && n - k - 1 >= 0;
+          gc.visible = amt > 0.01 && n >= 1;
           gc.matrix.copy(castInDie(DIE.open, DIE.eject));
           gc.matrixWorldNeedsUpdate = true;
-          void op;
         }
+        for (const m of ghostMats) m.opacity = (p.ghost ?? 0.28) * amt;
       }
 
       // smoke
@@ -294,7 +301,8 @@ export async function create({ renderer, scale, p, dur, cues }) {
         const dk = ss(clamp((t - tDark) / 1.1));
         key.intensity = keyI * (1 - 0.82 * dk);
         rim.intensity = rimI * (1 - 0.6 * dk);
-        hemi.intensity = (p.fill ?? 0.25) * (1 - 0.7 * dk);
+        hemi.intensity = (p.fill ?? 0.12) * (1 - 0.7 * dk);
+        glow.intensity *= 1 - 0.65 * dk;
         st.scene.environmentIntensity = (p.env ?? 0.12) * (1 - 0.7 * dk);
       }
 
@@ -308,15 +316,36 @@ export async function create({ renderer, scale, p, dur, cues }) {
       const w = weave(t, 0.0013, 9);
       st.camera.rotation.y += w[0];
       st.camera.rotation.x += w[1];
-      if (st.camera.fov !== cam.fov) {
-        st.camera.fov = cam.fov;
+      const fov = lerp(cam.fov, cam.fovTo ?? cam.fov, r);
+      if (st.camera.fov !== fov) {
+        st.camera.fov = fov;
         st.camera.updateProjectionMatrix();
       }
       if (st.dof) st.dof.target = mode === 'blind' ? uni.graspWorld() : mode === 'work' ? V3(...look) : PICK.clone();
       st.camera.updateMatrixWorld();
-      const sp = toScreen(st.camera, PICK);
+      const sp = toScreen(st.camera, PICK.clone().add(V3(0, 0.02, -0.13)));
       pickScreen.x = sp[0];
       pickScreen.y = sp[1];
+      if (halo.p && halo.a > 0.01) {
+        // how much of the hot part the camera can see (a few rays against the machine and the robot)
+        let vis = 0;
+        const dirs = [[0, 0, 0], [0, 0.04, 0.05], [0, -0.04, -0.05], [0, 0.04, -0.05], [0, -0.04, 0.05]];
+        for (const d of dirs) {
+          const q = halo.p.clone().add(V3(...d));
+          const dv = q.clone().sub(st.camera.position);
+          const L = dv.length();
+          ray.set(st.camera.position, dv.normalize());
+          ray.far = L - 0.03;
+          const hit = ray.intersectObjects(occluders, true);
+          if (!hit.length) vis += 1 / dirs.length;
+        }
+        halo.a *= vis;
+        if (mode === 'blind') halo.a *= 0.35;
+        const hp = toScreen(st.camera, halo.p);
+        halo.x = hp[0];
+        halo.y = hp[1];
+        halo.r = (1080 / (2 * Math.tan((st.camera.fov * Math.PI) / 360))) * 0.22 / Math.max(0.3, st.camera.position.distanceTo(halo.p));
+      }
     },
     overlay(g, t) {
       archive(g, t, { amount: p.archive ?? 1, seed: 61, tint: [255, 228, 192] });
@@ -326,6 +355,28 @@ export async function create({ renderer, scale, p, dur, cues }) {
       g.fillStyle = `rgba(128,128,128,${0.25 * (p.archive ?? 1)})`;
       g.fillRect(0, 0, 1920, 1080);
       g.restore();
+      // the hot part: warm colour survives the fade (a colour-blend tint), and its glow bleeds into the emulsion
+      const hot = (x, y, r, a) => {
+        if (a <= 0.01 || r <= 1) return;
+        g.save();
+        g.globalCompositeOperation = 'color';
+        const gt = g.createRadialGradient(x, y, 0, x, y, r * 1.3);
+        gt.addColorStop(0, `rgba(255,120,30,${0.8 * Math.min(1, a * 1.5)})`);
+        gt.addColorStop(1, 'rgba(255,120,30,0)');
+        g.fillStyle = gt;
+        g.fillRect(x - r * 1.3, y - r * 1.3, r * 2.6, r * 2.6);
+        g.globalCompositeOperation = 'screen';
+        const gr = g.createRadialGradient(x, y, 0, x, y, r * 2.4);
+        const k = a * (p.halo ?? 1);
+        gr.addColorStop(0, `rgba(255,150,60,${0.85 * k})`);
+        gr.addColorStop(0.22, `rgba(255,110,30,${0.42 * k})`);
+        gr.addColorStop(1, 'rgba(255,80,10,0)');
+        g.fillStyle = gr;
+        g.fillRect(x - r * 2.4, y - r * 2.4, r * 4.8, r * 4.8);
+        g.restore();
+      };
+      hot(halo.x, halo.y, halo.r, halo.a * (mode === 'repeat' ? 0.6 : 1));
+      if (mode === 'repeat' && ghostAmt > 0.01) hot(pickScreen.x, pickScreen.y, halo.r * 0.9, 0.45 * ghostAmt);
       if (mode === 'work') {
         const tT = cues.title ?? 0.5;
         const a = sstep(tT, tT + 0.9, t) * (1 - sstep(Math.min(dur - 0.6, tT + 4.5), Math.min(dur, tT + 5.3), t));
@@ -352,11 +403,13 @@ export async function create({ renderer, scale, p, dur, cues }) {
         // registration marks on the pick point
         if (lock > 0.001) {
           const { x, y } = pickScreen;
-          const r0 = lerp(120, 46, ss(lock));
+          const r0 = lerp(170, 78, ss(lock));
           g.save();
           g.globalAlpha *= lock;
           g.strokeStyle = 'rgba(240,206,140,0.95)';
-          g.lineWidth = 1.6;
+          g.shadowColor = 'rgba(0,0,0,0.8)';
+          g.shadowBlur = 6;
+          g.lineWidth = 2.6;
           for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
             g.beginPath();
             g.moveTo(x + sx * r0, y + sy * (r0 - 16));

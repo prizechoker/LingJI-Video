@@ -127,26 +127,32 @@ export function bake(root, { keep = [] } = {}) {
 // ---------------------------------------------------------------- materials
 export function homeMaterials(st, env) {
   const M = {};
-  const wall = st.pbr('PaintedPlaster017', { repeat: [0.45, 0.45] });
+  // big surfaces: standard materials and modest anisotropy (software rendering pays per pixel for every layer)
+  const P = (name, o, aniso = 2) => {
+    const t = st.pbr(name, o);
+    for (const k of ['map', 'normalMap', 'roughnessMap']) t[k].anisotropy = aniso;
+    return t;
+  };
+  const wall = P('PaintedPlaster017', { repeat: [0.45, 0.45] }, 1);
   M.wall = new THREE.MeshStandardMaterial({ ...wall, color: 0xf3eadb, roughness: 0.92, normalScale: new THREE.Vector2(0.5, 0.5) });
   M.wallBack = new THREE.MeshStandardMaterial({ ...wall, color: 0xefe2cc, roughness: 0.92, normalScale: new THREE.Vector2(0.5, 0.5) });
   M.ceiling = new THREE.MeshStandardMaterial({ color: 0xe9e4da, roughness: 0.95 });
-  const fl = st.pbr('WoodFloor051', { repeat: [0.42, 0.42] });
-  M.floor = new THREE.MeshPhysicalMaterial({ ...fl, color: 0xc9b29c, roughness: 0.7, clearcoat: 0.25, clearcoatRoughness: 0.35 });
-  const oak = st.pbr('Wood022', { repeat: [0.7, 0.7] });
+  const fl = P('WoodFloor051', { repeat: [0.42, 0.42] }, 4);
+  M.floor = new THREE.MeshStandardMaterial({ ...fl, color: 0xc9b29c, roughness: 0.62 });
+  const oak = P('Wood022', { repeat: [0.7, 0.7] }, 4);
   M.oak = new THREE.MeshPhysicalMaterial({ ...oak, color: 0xe2c49c, roughness: 0.55, clearcoat: 0.2, clearcoatRoughness: 0.4 });
-  const wal = st.pbr('Wood026', { repeat: [0.8, 0.8] });
-  M.walnut = new THREE.MeshPhysicalMaterial({ ...wal, color: 0xb28a6c, roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.3 });
-  M.chairWood = new THREE.MeshPhysicalMaterial({ ...st.pbr('Wood022', { repeat: [2.2, 2.2] }), color: 0xcfa77e, roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.35 });
+  const wal = P('Wood026', { repeat: [0.8, 0.8] });
+  M.walnut = new THREE.MeshStandardMaterial({ ...wal, color: 0xb28a6c, roughness: 0.42 });
+  M.chairWood = new THREE.MeshStandardMaterial({ ...P('Wood022', { repeat: [2.2, 2.2] }), color: 0xcfa77e, roughness: 0.5 });
   M.paint = new THREE.MeshStandardMaterial({ color: 0xf0ebe2, roughness: 0.45 });  // trim: skirting, casing, frames
-  const rug = st.pbr('Carpet016', { repeat: [1.3, 1.3] });
+  const rug = P('Carpet016', { repeat: [1.3, 1.3] }, 1);
   M.rug = new THREE.MeshStandardMaterial({ ...rug, color: 0xc9b29a, roughness: 1, normalScale: new THREE.Vector2(0.8, 0.8) });
-  const lin = st.pbr('Fabric082A', { repeat: [3, 3] });
-  M.linen = new THREE.MeshPhysicalMaterial({ ...lin, color: 0xf4ede2, roughness: 0.95, sheen: 0.3, sheenRoughness: 0.8, sheenColor: new THREE.Color(0xfff2e0), side: THREE.DoubleSide, normalScale: new THREE.Vector2(0.4, 0.4) });
-  M.seat = new THREE.MeshPhysicalMaterial({ ...st.pbr('Fabric030', { repeat: [4, 4] }), color: 0xe0cfb4, roughness: 1, sheen: 0.5, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xd8c8b0) });
-  M.brass = new THREE.MeshPhysicalMaterial({ color: 0xcfa968, metalness: 1, roughness: 0.32, envMap: env, envMapIntensity: 1.2 });
-  M.black = new THREE.MeshPhysicalMaterial({ color: 0x1a1a1a, metalness: 0.6, roughness: 0.45 });
-  M.glass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.1, envMap: env, envMapIntensity: 1.5, depthWrite: false });
+  const lin = P('Fabric082A', { repeat: [3, 3] }, 1);
+  M.linen = new THREE.MeshStandardMaterial({ ...lin, color: 0xf4ede2, roughness: 0.95, side: THREE.DoubleSide, normalScale: new THREE.Vector2(0.4, 0.4) });
+  M.seat = new THREE.MeshPhysicalMaterial({ ...P('Fabric030', { repeat: [4, 4] }, 1), color: 0xe0cfb4, roughness: 1, sheen: 0.5, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xd8c8b0) });
+  M.brass = new THREE.MeshStandardMaterial({ color: 0xcfa968, metalness: 1, roughness: 0.32, envMap: env, envMapIntensity: 1.2 });
+  M.black = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.6, roughness: 0.45 });
+  M.glass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.1, envMap: env, envMapIntensity: 1.5, depthWrite: false });
   return M;
 }
 

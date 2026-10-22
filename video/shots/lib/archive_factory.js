@@ -13,13 +13,33 @@ export const UNI = { at: V(DIE.open - DIE.eject - 0.012, 0, 2.25), BH: 0.9, pivo
 
 // ---------------------------------------------------------------- materials
 
+// a grime multiplier: soft dark blotches and fine speckle, darker toward the texture's bottom edge
+function grimeTexture(seed = 8) {
+  const n = 512;
+  const nz = noise2(seed);
+  const c = canvas(n, n);
+  const g = c.getContext('2d');
+  const img = g.createImageData(n, n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const f = fbm(nz, x / 70, y / 70, 4, 16);
+    const sp = fbm(nz, x / 3 + 11, y / 3, 2, 64);
+    const v = 255 * Math.min(1, 0.8 + 0.28 * f - 0.08 * Math.max(0, sp - 0.6) * 4 - 0.1 * (y / n) ** 3);
+    const i = (y * n + x) * 4;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return canvasTex(c);
+}
+
 export function factoryMaterials(st) {
   const M = (o) => new THREE.MeshPhysicalMaterial(o);
+  const grime = grimeTexture();
   const worn = st.pbr('Metal055A', { repeat: [2, 2] });
   const brushed = st.pbr('Metal032', { repeat: [2, 6] });
   return {
     // Unimate: dark blue-grey enamel, bare steel boom, black hoses
-    paint: M({ color: 0x4a5866, metalness: 0.3, roughness: 0.42, roughnessMap: worn.roughnessMap, clearcoat: 0.35, clearcoatRoughness: 0.4 }),
+    paint: M({ map: grime, color: 0x4f5f70, metalness: 0.3, roughness: 0.42, roughnessMap: worn.roughnessMap, clearcoat: 0.3, clearcoatRoughness: 0.45 }),
     paintDark: M({ color: 0x2c343c, metalness: 0.3, roughness: 0.5 }),
     trim: M({ color: 0x8c949a, metalness: 0.9, roughness: 0.35 }),
     boom: M({ color: 0xc9ced2, metalness: 1, roughness: 0.2, roughnessMap: brushed.roughnessMap, normalMap: brushed.normalMap, normalScale: new THREE.Vector2(0.25, 0.25) }),
@@ -33,11 +53,11 @@ export function factoryMaterials(st) {
     lampW: M({ color: 0x8a8a7a, emissive: 0xfff2c0, emissiveIntensity: 0.4, roughness: 0.3 }),
     plate: M({ color: 0xb8b29a, metalness: 0.6, roughness: 0.35 }),
     // die-casting machine: machine green-grey, chrome tie bars, tool steel dies
-    machine: M({ color: 0x55615a, metalness: 0.35, roughness: 0.5, roughnessMap: worn.roughnessMap, clearcoat: 0.2, clearcoatRoughness: 0.5 }),
+    machine: M({ map: grime, color: 0x58655d, metalness: 0.35, roughness: 0.5, roughnessMap: worn.roughnessMap, clearcoat: 0.2, clearcoatRoughness: 0.5 }),
     machineDark: M({ color: 0x2e3532, metalness: 0.35, roughness: 0.55 }),
     chrome: M({ color: 0xd8dde0, metalness: 1, roughness: 0.12 }),
-    die: M({ ...worn, color: 0x8a8c8c, metalness: 1, roughness: 0.48 }),
-    dieFace: M({ color: 0x4c4945, metalness: 0.9, roughness: 0.45, roughnessMap: worn.roughnessMap }),
+    die: M({ ...worn, color: 0x8a8c8c, metalness: 0.85, roughness: 0.62 }),
+    dieFace: M({ color: 0x4c4945, metalness: 0.6, roughness: 0.8 }),
     oily: M({ color: 0x1a1816, metalness: 0.2, roughness: 0.25, clearcoat: 0.6, clearcoatRoughness: 0.2 }),
     gauge: M({ color: 0xe6e1d2, roughness: 0.4 }),
     glass: M({ color: 0x111316, roughness: 0.05, metalness: 0.1, clearcoat: 1, transparent: true, opacity: 0.35 }),
@@ -45,36 +65,45 @@ export function factoryMaterials(st) {
     tank: M({ color: 0x3a3f3c, metalness: 0.4, roughness: 0.55, roughnessMap: worn.roughnessMap }),
     water: M({ color: 0x1c2122, roughness: 0.12, metalness: 0.0, clearcoat: 1, clearcoatRoughness: 0.08 }),
     // the glowing casting: emissive set per frame from its temperature
-    hot: new THREE.MeshStandardMaterial({ ...hotTextures(), color: 0xffffff, metalness: 0.4, roughness: 0.6, emissive: 0xff5a14, emissiveIntensity: 2 }),
+    hot: glowShading(new THREE.MeshStandardMaterial({ ...hotTextures(), color: 0xffffff, metalness: 0.4, roughness: 0.55, emissive: 0xff5a14, emissiveIntensity: 2 })),
   };
 }
 
 // ---------------------------------------------------------------- the casting (door handle + runner + biscuit)
 
-// local frame: lies in the y/z plane (the die's parting plane), thin in x; origin at the gripper's grasp point
-// (a tab at the near end of the runner). A ribbed flange housing on its gate, the runner, the biscuit.
+// local frame: lies in the y/z plane (the die's parting plane), its cavity side toward +x; origin at the gripper's
+// grasp point (the sprue stub at its near end). A small cast housing: a walled cup with a flange, corner bosses and
+// ribs, as it comes out of the die.
 export function castingGeometry() {
   const P = new Parts();
-  const c = [0, 0.055, -0.17]; // the part's centre
-  const ax = [0, 0, Math.PI / 2]; // cylinders along x
-  P.cyl('hot', 0.085, 0.085, 0.022, c, { rot: ax, seg: 48 }); // flange
-  P.cyl('hot', 0.05, 0.056, 0.05, [0.026, c[1], c[2]], { rot: ax, seg: 40 }); // body
-  P.cyl('hot', 0.03, 0.03, 0.03, [0.06, c[1], c[2]], { rot: ax, seg: 32 }); // boss
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2 + 0.3;
-    P.box('hot', [0.04, 0.012, 0.03], [0.022, c[1] + Math.cos(a) * 0.065, c[2] + Math.sin(a) * 0.065], { rot: [-a, 0, 0] }); // ribs
-  }
-  for (let k = 0; k < 3; k++) {
-    const a = (k / 3) * Math.PI * 2 + 0.9;
-    P.cyl('hot', 0.016, 0.016, 0.024, [0, c[1] + Math.cos(a) * 0.098, c[2] + Math.sin(a) * 0.098], { rot: ax, seg: 16 }); // lugs
-    P.box('hot', [0.02, 0.024, 0.03], [0, c[1] + Math.cos(a) * 0.088, c[2] + Math.sin(a) * 0.088], { rot: [-a, 0, 0] });
-  }
-  P.add('hot', new RoundedBoxGeometry(0.022, 0.034, 0.08, 2, 0.005), mat4([0, 0, 0.0])); // grasp tab
-  P.add('hot', new RoundedBoxGeometry(0.02, 0.024, 0.2, 2, 0.006), mat4([0, -0.01, -0.1])); // runner
-  P.box('hot', [0.016, 0.03, 0.05], [0, 0.0, -0.11]); // gate into the flange
-  P.box('hot', [0.018, 0.05, 0.03], [0, -0.04, -0.2]);
-  P.cyl('hot', 0.046, 0.046, 0.04, [0, -0.085, -0.22], { rot: ax, seg: 32 }); // biscuit
+  const zc = -0.13, yc = 0.02; // centre of the housing
+  const L = 0.17, Hh = 0.11, D = 0.055, t = 0.012;
+  // floor (toward -x) and four walls rising toward +x
+  P.add('hot', new RoundedBoxGeometry(t, Hh, L, 2, 0.004), mat4([-D / 2 + t / 2, yc, zc]));
+  P.add('hot', new RoundedBoxGeometry(D, t, L, 2, 0.004), mat4([0, yc + Hh / 2 - t / 2, zc]));
+  P.add('hot', new RoundedBoxGeometry(D, t, L, 2, 0.004), mat4([0, yc - Hh / 2 + t / 2, zc]));
+  P.add('hot', new RoundedBoxGeometry(D, Hh, t, 2, 0.004), mat4([0, yc, zc + L / 2 - t / 2]));
+  P.add('hot', new RoundedBoxGeometry(D, Hh, t, 2, 0.004), mat4([0, yc, zc - L / 2 + t / 2]));
+  // flange around the open rim, with four bosses
+  P.add('hot', new RoundedBoxGeometry(0.01, Hh + 0.04, L + 0.04, 2, 0.004), mat4([D / 2 - 0.005, yc, zc]));
+  for (const sy of [-1, 1]) for (const sz of [-1, 1]) P.cyl('hot', 0.012, 0.013, 0.03, [D / 2 - 0.012, yc + sy * (Hh / 2 + 0.01), zc + sz * (L / 2 + 0.01)], { rot: [0, 0, Math.PI / 2], seg: 16 });
+  // ribs on the outside of the floor, and a boss in the middle
+  for (const z of [-0.05, 0, 0.05]) P.box('hot', [0.012, Hh - 0.02, 0.008], [-D / 2 - 0.005, yc, zc + z]);
+  P.cyl('hot', 0.02, 0.022, 0.02, [-D / 2 - 0.01, yc, zc], { rot: [0, 0, Math.PI / 2], seg: 20 });
+  // the sprue stub the gripper holds, broken off its runner
+  P.add('hot', new RoundedBoxGeometry(0.022, 0.032, 0.07, 2, 0.005), mat4([0, 0, -0.01]));
+  P.add('hot', new RoundedBoxGeometry(0.03, 0.04, 0.025, 2, 0.006), mat4([0, 0.005, -0.045]));
   return P;
+}
+
+// make an emissive material cooler at grazing angles (thin edges radiate faster): gives a hot part its volume
+export function glowShading(m, edge = 0.3) {
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      totalEmissiveRadiance *= mix(${edge.toFixed(3)}, 1.0, pow(clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 0.8));`);
+  };
+  m.customProgramCacheKey = () => `glow${edge}`;
+  return m;
 }
 
 // the glow of hot metal: an orange field broken by darker oxide scale (emissive map), and a dark crust albedo
@@ -85,10 +114,10 @@ export function hotTextures(seed = 3) {
   const ge = e.getContext('2d'), gc = c.getContext('2d');
   const ie = ge.createImageData(n, n), ic = gc.createImageData(n, n);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const f = fbm(nz, x / 22, y / 22, 4, 64);
+    const f = fbm(nz, x / 12, y / 12, 4, 64);
     const g = fbm(nz, x / 6 + 30, y / 6, 2, 64);
-    const scale = clamp((f - 0.42) * 4); // oxide patches
-    const k = (1 - 0.7 * scale) * (0.85 + 0.3 * g);
+    const scale = clamp((f - 0.5) * 3); // oxide patches
+    const k = (1 - 0.28 * scale) * (0.94 + 0.12 * g);
     const i = (y * n + x) * 4;
     ie.data[i] = 255 * Math.min(1, k);
     ie.data[i + 1] = 255 * Math.min(1, k * 0.95);
@@ -225,23 +254,49 @@ export function buildUnimate(st, mats) {
   const swivelG = new THREE.Group();
   bendG.add(swivelG);
   const H = new Parts();
-  H.cyl('steel', 0.07, 0.07, 0.07, [0, 0, -0.1], { rot: [Math.PI / 2, 0, 0], seg: 36 });
-  H.cyl('darkSteel', 0.075, 0.075, 0.012, [0, 0, -0.07], { rot: [Math.PI / 2, 0, 0], seg: 36 });
-  H.box('darkSteel', [0.2, 0.11, 0.06], [0, 0, -0.16], { bevel: 0.008 }); // palm
-  H.box('steel', [0.22, 0.03, 0.03], [0, 0.03, -0.19]); // finger slide rails
-  H.box('steel', [0.22, 0.03, 0.03], [0, -0.03, -0.19]);
-  H.cyl('darkSteel', 0.025, 0.025, 0.08, [0, 0.07, -0.15], { rot: [0, 0, Math.PI / 2], seg: 16 }); // grip cylinder
-  H.tube('hose', [V(0.02, 0.09, -0.14), V(0.05, 0.12, -0.08), V(0.06, 0.1, 0.0)], 0.008, { seg: 16, rseg: 8 });
+  const ZX = [Math.PI / 2, 0, 0];
+  // the swivel drum: turned steel with grooves, a flange and its bolt circle
+  H.cyl('steel', 0.07, 0.07, 0.07, [0, 0, -0.1], { rot: ZX, seg: 40 });
+  for (let k = 0; k < 3; k++) H.cyl('darkSteel', 0.0712, 0.0712, 0.004, [0, 0, -0.08 - k * 0.016], { rot: ZX, seg: 40 });
+  H.cyl('darkSteel', 0.08, 0.08, 0.012, [0, 0, -0.066], { rot: ZX, seg: 40 });
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    H.cyl('steel', 0.0055, 0.0055, 0.008, [Math.cos(a) * 0.064, Math.sin(a) * 0.064, -0.058], { rot: ZX, seg: 6 });
+  }
+  // the palm: a machined block, cap screws on its face, a T-rail the jaws ride on
+  H.add('darkSteel', new RoundedBoxGeometry(0.22, 0.13, 0.06, 2, 0.008), mat4([0, 0, -0.165]));
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    H.cyl('steel', 0.007, 0.007, 0.006, [sx * 0.088, sy * 0.048, -0.197], { rot: ZX, seg: 16 });
+    H.cyl('rubber', 0.003, 0.003, 0.0065, [sx * 0.088, sy * 0.048, -0.197], { rot: ZX, seg: 6 });
+  }
+  H.box('steel', [0.24, 0.045, 0.018], [0, 0, -0.204], { bevel: 0.003 });
+  // the grip cylinder across the top, its end caps, fittings and hoses
+  H.cyl('darkSteel', 0.026, 0.026, 0.16, [0, 0.088, -0.16], { rot: [0, 0, Math.PI / 2], seg: 24 });
+  for (const sx of [-1, 1]) {
+    H.cyl('steel', 0.031, 0.031, 0.014, [sx * 0.082, 0.088, -0.16], { rot: [0, 0, Math.PI / 2], seg: 24 });
+    H.cyl('steel', 0.009, 0.009, 0.022, [sx * 0.055, 0.118, -0.16], { seg: 6 });
+    H.tube('hose', [V(sx * 0.055, 0.128, -0.16), V(sx * 0.06, 0.15, -0.11), V(sx * 0.07, 0.13, -0.03), V(sx * 0.07, 0.1, 0.02)], 0.007, { seg: 20, rseg: 8 });
+  }
   swivelG.add(H.build(mats));
   const fingers = [];
   for (const s of [-1, 1]) {
     const f = new THREE.Group();
     const F = new Parts();
-    F.box('steel', [0.035, 0.08, 0.04], [0, 0, -0.2], { bevel: 0.005 });
-    F.box('steel', [0.03, 0.06, 0.15], [0, 0, -0.285], { bevel: 0.005 });
-    // jaw pad with serrations facing the other finger
-    F.box('darkSteel', [0.008, 0.05, 0.09], [-s * 0.017, 0, -0.31]);
-    for (let k = 0; k < 9; k++) F.box('darkSteel', [0.004, 0.05, 0.004], [-s * 0.022, 0, -0.27 - k * 0.01]);
+    F.add('steel', new RoundedBoxGeometry(0.046, 0.075, 0.034, 2, 0.005), mat4([0, 0, -0.23]));
+    for (const sy of [-1, 1]) F.cyl('darkSteel', 0.0055, 0.0055, 0.005, [0, sy * 0.022, -0.2485], { rot: ZX, seg: 12 });
+    // the jaw: a tapered steel finger
+    const jaw = new THREE.BoxGeometry(0.026, 0.06, 0.13, 1, 1, 6);
+    const jp = jaw.attributes.position;
+    for (let i = 0; i < jp.count; i++) {
+      const u = (0.065 - jp.getZ(i)) / 0.13; // 0 at the root, 1 at the tip
+      jp.setY(i, jp.getY(i) * lerp(1, 0.55, u));
+    }
+    jaw.computeVertexNormals();
+    F.add('steel', jaw, mat4([s * 0.004, 0, -0.31]));
+    // hardened jaw insert, serrated, facing the other finger
+    F.box('darkSteel', [0.006, 0.036, 0.08], [-s * 0.0115, 0, -0.33]);
+    for (let k = 0; k < 9; k++) F.box('darkSteel', [0.004, 0.034, 0.003], [-s * 0.0155, 0, -0.296 - k * 0.0085]);
+    F.cyl('steel', 0.005, 0.005, 0.03, [s * 0.004, 0, -0.33], { rot: [0, 0, Math.PI / 2], seg: 12 });
     f.add(F.build(mats));
     swivelG.add(f);
     fingers.push([f, s]);
@@ -280,7 +335,7 @@ export function buildUnimate(st, mats) {
       extG.position.z = -UNI.house - ext;
       bendG.rotation.x = bend;
       swivelG.rotation.z = swivel;
-      const half = lerp(0.055, 0.0105 + 0.0175, clamp(grip));
+      const half = lerp(0.07, 0.011 + 0.0175, clamp(grip));
       for (const [f, s] of fingers) f.position.x = s * half;
       const k = Math.round(ext * 400);
       if (k !== hoseKey) {
@@ -495,7 +550,28 @@ export function buildHall(st, mats) {
   }
   grp.add(L.build({ shade }, { cast: false }));
   grp.add(B2.build({ bulb }, { cast: false, receive: false }));
-  return { group: grp, lamps };
+  // shafts of daylight from the high windows through the haze (additive, soft-edged)
+  const beamMat = new THREE.ShaderMaterial({
+    uniforms: { uC: { value: new THREE.Color(0.75, 0.85, 1.0) }, uI: { value: 0.05 } },
+    vertexShader: `varying vec3 vN; varying vec3 vV; varying float vL;
+      void main() { vL = uv.y; vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = -mv.xyz; vN = normalMatrix * normal; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 uC; uniform float uI; varying vec3 vN; varying vec3 vV; varying float vL;
+      void main() { float f = pow(abs(dot(normalize(vN), normalize(vV))), 2.5);
+        float a = f * smoothstep(1.0, 0.82, vL) * smoothstep(0.0, 0.5, vL) * uI; gl_FragColor = vec4(uC * a, 1.0); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  });
+  const beams = new THREE.Group();
+  for (const [x0, x1, z1] of [[-3.9, -2.6, -1.2], [-1.3, -0.4, 0.2], [1.3, 1.6, -0.6], [3.9, 3.6, 0.8]]) {
+    const a = V(x0, 6.6, -9.3), b = V(x1, 0.0, z1);
+    const g = new THREE.CylinderGeometry(1.1, 0.75, a.distanceTo(b), 24, 1, true);
+    const m = new THREE.Mesh(g, beamMat);
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(V(0, 1, 0), a.clone().sub(b).normalize());
+    m.renderOrder = 3;
+    beams.add(m);
+  }
+  grp.add(beams);
+  return { group: grp, lamps, beamMat };
 }
 
 // ---------------------------------------------------------------- smoke / steam

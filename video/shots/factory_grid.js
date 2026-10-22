@@ -59,7 +59,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
   const fac = await buildFactory(st, {
     block: (r, j) => (openBlock(r, j) ? null : ((j + r * 2) % 4 === 3 ? 'handle' : 'weld')),
     hazeI: p.haze ?? (mode === 'board' ? 0 : 0.01),
-    fixtures: mode !== 'board',
+    fixtures: mode === 'match',
     jRange: p.jRange || [-7, 2],
   });
   st.scene.add(fac.group);
@@ -80,7 +80,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
   st.scene.add(hemi);
   fac.floorMat.userData.u.uPoolCol.value.set(0xdde9ff).multiplyScalar(p.pools ?? 2.8);
   fac.floorMat.userData.u.uPoolRad.value.set(1.7, 2.1);
-  fac.floorMat.userData.u.uRefCol.value.set(0xeaf3ff).multiplyScalar(p.refl ?? (mode === 'board' ? 0 : 1.6));
+  fac.floorMat.userData.u.uRefCol.value.set(0xeaf3ff).multiplyScalar(p.refl ?? (mode === 'match' ? 1.6 : 0));
   // the arcs light their cells: two flickering blue-white point lights ride the nearest torches
   const arcLights = [].map(() => {
     const l = new THREE.PointLight(0xc4dcff, 0, 7, 2);
@@ -162,7 +162,8 @@ export async function create({ renderer, scale, p, dur, cues }) {
     const y = lerp(hf, 8.6, tilt) + 0.25 * tail;
     const z = lerp(0, 9.5, ss(clamp((t - 0.6) / Math.max(1.2, tFac + 1.0 - 0.6)))) + 0.9 * tail;
     const pitch = lerp(-90, -27, tilt) * DEG + 1.2 * DEG * tail;
-    const fov = lerp(FOV_F, 46, ss(clamp((t - 0.8) / Math.max(1.2, tFac + 1.0 - 0.8))));
+    const fov = lerp(FOV_F, 48, ss(clamp((t - 0.8) / Math.max(1.2, tFac + 1.0 - 0.8))));
+    fac.haze.material.uniforms.uI.value = (p.haze ?? 0.01) * tilt * tilt;
     const b = breathe(t, 0.012 * tilt, 4);
     setCam(st.camera, [b[0], y + b[1], z + b[2]], pitch, fov);
     if (board) setCam(board.camera, [0, hb, 0], -90 * DEG, FOV_B);
@@ -176,12 +177,15 @@ export async function create({ renderer, scale, p, dur, cues }) {
     setCam(st.camera, [BOARD_C.x + b[0], d * Math.sin(el) + b[1], cz + d * Math.cos(el) + b[2]], -el, 42);
   };
   const coldCam = (t) => {
+    // high and long across the rows: the cells stack into a lattice; a slow sideways drift
     const r = clamp(t / dur);
-    const e = r * 0.85 + ss(r) * 0.15;
+    const e = r * 0.8 + ss(r) * 0.2;
     const b = breathe(t, 0.02, 9);
-    setCam(st.camera, [lerp(-1.6, 1.2, e) + b[0], 8.2 + b[1], lerp(14.5, 12.5, e) + b[2]], -23 * DEG, 36, lerp(-3.5, 2.5, e) * DEG);
+    const pos = [lerp(-15.5, -13.3, e) + b[0], 17 + b[1], lerp(11, 12.4, e) + b[2]];
+    const look = [lerp(1.5, 3.3, e), 0, -14];
+    const dx = look[0] - pos[0], dy = look[1] - pos[1], dz = look[2] - pos[2];
+    setCam(st.camera, pos, Math.atan2(dy, Math.hypot(dx, dz)), 30, Math.atan2(-dx, -dz));
   };
-
   // render: before the dissolve only the board; during it the factory (+ the board over it in overlay())
   const factoryRender = st.render.bind(st);
   let mixNow = 1;

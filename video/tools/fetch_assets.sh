@@ -9,7 +9,7 @@ curl -fsSL -o assets/mh/base.obj "$MH/makehuman/data/3dobjs/base.obj"
 curl -fsSL -o assets/mh/default.mhskel "$MH/makehuman/data/rigs/default.mhskel"
 curl -fsSL -o assets/mh/default_weights.mhw "$MH/makehuman/data/rigs/default_weights.mhw"
 curl -fsSL -o assets/mh/LICENSE.md "$MH/LICENSE.md"
-for h in studio_small_09 lebombo comfy_cafe blinds kiara_interior glasshouse_interior brown_photostudio_04; do
+for h in studio_small_09 lebombo comfy_cafe blinds kiara_interior glasshouse_interior brown_photostudio_04 potsdamer_platz; do
   curl -fsSL -o "assets/hdri/${h}_2k.hdr" "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/${h}_2k.hdr"
 done
 tmp=$(mktemp -d)

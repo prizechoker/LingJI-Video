@@ -4,12 +4,13 @@
 import { THREE } from '../../engine2/core.js';
 import { botMaterial } from '../../engine2/bot.js';
 import { loadBotHand, solvePinch, padPoint, FOREARM } from '../../engine2/bothand.js';
+import { loadHand } from '../../engine2/hand.js';
 import { bowlGeometry } from '../../engine2/dishes.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
-export async function rimGrip(st, { base, want = V3(-0.3, -0.55, -0.75), camPos, gap = 0.0045, material } = {}) {
-  const h = await loadBotHand(st, { material: material || botMaterial({ white: 0xdfe2e6, envDiffuse: 0.9, seam: 0.0005, dark: 0.7 }) });
+export async function rimGrip(st, { base, want = V3(-0.3, -0.55, -0.75), camPos, gap = 0.0045, material, human = false } = {}) {
+  const h = human ? await loadHand(st, material ? { material } : {}) : await loadBotHand(st, { material: material || botMaterial({ white: 0xdfe2e6, envDiffuse: 0.9, seam: 0.0005, dark: 0.7 }) });
   const pinch = solvePinch(h, gap);
   const basis = (x, y) => new THREE.Matrix4().makeBasis(x, y, V3().crossVectors(x, y));
   const tP = padPoint(h, 1), fP = padPoint(h, 2).lerp(padPoint(h, 3), 0.5);

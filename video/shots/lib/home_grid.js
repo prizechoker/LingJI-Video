@@ -8,7 +8,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { rng, clamp, sstep, lerp } from './kit.js';
 
 // the room's top surface, seen straight down: y of the highest surface at (x, z), sampled bilinearly
-export function heightField(renderer, scene, { x0, x1, z0, z1, res = 512, hide = [] }) {
+export function heightField(renderer, scene, { x0, x1, z0, z1, res = 512, hide = [], cap = 1.2, slope = 1.4 }) {
   const cam = new THREE.OrthographicCamera(x0, x1, -z0, -z1, 0.1, 20);
   // looking down -y with +x right and +z down the image
   cam.position.set(0, 10, 0);
@@ -59,7 +59,31 @@ export function heightField(renderer, scene, { x0, x1, z0, z1, res = 512, hide =
   mat.dispose();
   // row 0 of the read-back is the bottom of the image (z1)
   const Hm = new Float32Array(res * res);
-  for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) Hm[j * res + i] = buf[(j * res + i) * 4];
+  for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) Hm[j * res + i] = Math.min(cap, buf[(j * res + i) * 4]);
+  // a sheet can't fall straight down an edge: limit the slope (chamfer dilation, two passes)
+  if (slope) {
+    const dx = (x1 - x0) / (res - 1), k1 = slope * dx, k2 = slope * dx * Math.SQRT2;
+    for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
+      let h = Hm[j * res + i];
+      if (i > 0) h = Math.max(h, Hm[j * res + i - 1] - k1);
+      if (j > 0) {
+        h = Math.max(h, Hm[(j - 1) * res + i] - k1);
+        if (i > 0) h = Math.max(h, Hm[(j - 1) * res + i - 1] - k2);
+        if (i < res - 1) h = Math.max(h, Hm[(j - 1) * res + i + 1] - k2);
+      }
+      Hm[j * res + i] = h;
+    }
+    for (let j = res - 1; j >= 0; j--) for (let i = res - 1; i >= 0; i--) {
+      let h = Hm[j * res + i];
+      if (i < res - 1) h = Math.max(h, Hm[j * res + i + 1] - k1);
+      if (j < res - 1) {
+        h = Math.max(h, Hm[(j + 1) * res + i] - k1);
+        if (i < res - 1) h = Math.max(h, Hm[(j + 1) * res + i + 1] - k2);
+        if (i > 0) h = Math.max(h, Hm[(j + 1) * res + i - 1] - k2);
+      }
+      Hm[j * res + i] = h;
+    }
+  }
   const sample = (x, z) => {
     const fx = clamp((x - x0) / (x1 - x0), 0, 0.99999) * (res - 1);
     const fz = clamp((z1 - z) / (z1 - z0), 0, 0.99999) * (res - 1);
@@ -94,8 +118,8 @@ export function lightGrid(hf, { x0, x1, z0, z1, step = 0.25, ds = 0.02, scale = 
   for (const ln of lines) {
     let k = 0;
     while (k < ln.n) {
-      const len = Math.max(3, Math.round((0.15 + R() * 0.45) / ds));
-      const f = { a: k, b: Math.min(ln.n, k + len), line: ln, v: [(R() - 0.5) * 0.5, 0.15 + R() * 0.55, (R() - 0.5) * 0.5], spin: (R() - 0.5) * 2.5, delay: R() * 0.35, life: 0.45 + R() * 0.5, flick: R() * 6.28 };
+      const len = Math.max(3, Math.round((0.08 + R() * 0.24) / ds));
+      const f = { a: k, b: Math.min(ln.n, k + len), line: ln, v: [(R() - 0.5) * 0.7, 0.2 + R() * 0.6, (R() - 0.5) * 0.7], spin: (R() - 0.5) * 3, delay: R() * 0.3, life: 0.3 + R() * 0.45, flick: R() * 6.28 };
       frags.push(f);
       for (let q = f.a; q < f.b; q++) segs.push({ i: ln.first + q, j: ln.first + q + 1, frag: f });
       k = f.b;
