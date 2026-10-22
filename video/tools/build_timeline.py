@@ -16,7 +16,7 @@ SCRIPT = json.load(open("data/script.json", encoding="utf-8"))
 UNITS = {u["id"]: u for u in SCRIPT["units"]}
 NU = {u["id"]: u for u in NARR["units"]}
 DIG = dict(zip("0123456789", "零一二三四五六七八九"))
-FPS = 30
+FPS = 24
 
 
 def norm(s):
@@ -80,14 +80,14 @@ def storyboard():
     # hook
     S.append(shot("go_place", 0.0, A("H1", "为什么", -0.08), p=dict(cam="hero", slow=2.6), cues=dict(contact=A("H1", "冠军", 0.05))))
     S.append(shot("dish", A("H1", "为什么", -0.08), A("H1", "$", 0.5), cues=dict(slip=A("H1", "为什么", 0.25), impact=A("H1", "碗", 0.0))))
-    S.append(shot("go_board", A("H1", "$", 0.5), A("H2", "$", 1.35), p=dict(mode="still", n=37, cam="edge", focus=[0.111, 0, 0], range=0.02)))
+    S.append(shot("go_board", A("H1", "$", 0.5), A("H2", "$", 1.35), p=dict(mode="still", n=37, cam="macro", key=6)))
     # 1 第37手
     S.append(shot("hall", A("A01", "^", -0.7), A("A02", "^", -0.12), p=dict(mode="wide"), cues=dict(date=A("A01", "^", 0.0)), fadeIn=0.6))
     S.append(shot("hall", A("A02", "^", -0.12), A("A02", "另一边", -0.12), p=dict(mode="lee"), cues=dict(lee=A("A02", "李世石", -0.3))))
     S.append(shot("hall", A("A02", "另一边", -0.12), A("A03", "^", -0.12), p=dict(mode="machine"), cues=dict(alphago=A("A02", "alphago", -0.2))))
     S.append(shot("scorecard", A("A03", "^", -0.12), A("A04", "$", 0.55), cues=dict(five=A("A03", "五比零", -0.1), four=A("A03", "四比一", -0.1), lose=A("A04", "输了", -0.12)), fadeIn=0.25))
     S.append(shot("hall", A("A04", "$", 0.55), A("A05", "$", 0.3), p=dict(mode="empty"), cues=dict(rise=A("A05", "起身", -0.15)), fadeIn=0.3))
-    S.append(shot("go_place", A("A05", "$", 0.3), A("A06", "$", 0.95), p=dict(cam="low", slow=2.2, label=dict(text="第 37 手", size=104, y=280)),
+    S.append(shot("go_place", A("A05", "$", 0.3), A("A06", "$", 0.95), p=dict(slow=2.2, camera=dict(pos=[0.018, 0.03, -0.095], look=[0.111, 0.009, 0.0], fov=16), label=dict(text="第 37 手", size=104, y=280)),
                   cues=dict(contact=A("A06", "一手", 0.1), label=A("A06", "第三十七手", -0.05))))
     S.append(shot("commentary", A("A06", "$", 0.95), A("A07", "$", 0.6), cues=dict(strange=A("A07", "很奇怪", -0.7), place=A("A07", "很奇怪", 0.8), mistake=A("A07", "我以为", 0.0)), fadeIn=0.3))
     S.append(shot("hall", A("A07", "$", 0.6), A("A08", "$", 0.45), p=dict(mode="pov"), cues=dict(think=A("A08", "盯着棋盘", 0.0)), fadeIn=0.3))
@@ -98,7 +98,7 @@ def storyboard():
                   cues=dict(a=A("A11", "^", 0.2), b=A("A11", "$", 0.0), curve=A("A11", "alphago", -0.15)), fadeIn=0.25))
     S.append(shot("go_place", A("A11", "$", 0.45), A("A12", "$", 0.9), p=dict(side="W", color="W", n=211, move=211, at=[0.15, -0.219], slow=1.6,
                   camera=dict(pos=[0.5, 0.12, -0.02], look=[0.13, 0.01, -0.2], fov=26)), cues=dict(contact=A("A12", "投子", 0.15)), fadeIn=0.2))
-    S.append(shot("go_board", A("A12", "$", 0.9), A("A13", "$", 1.2), p=dict(mode="still", n=211, cam="edge", dim=0.35), fadeIn=0.4))
+    S.append(shot("go_board", A("A12", "$", 0.9), A("A13", "$", 1.2), p=dict(mode="still", n=211, cam="top", dim=0.55, exposure=0.8), fadeIn=0.4))
     # 2 拿不起的棋子
     S.append(shot("go_place", A("A13", "$", 1.2), A("B15", "$", 0.6), p=dict(cam="reveal", slow=2.0, revealDur=3.6),
                   cues=dict(contact=A("B14", "细节", 0.2), reveal=A("B15", "并不是", -0.4)), fadeIn=0.5))
@@ -150,7 +150,7 @@ def storyboard():
     S.append(shot("hands", A("F42", "接住", -0.25), A("F42", "$", 0.7), p=dict(mode="catch", slow=5), cues=dict(catch=A("F42", "杯子", 0.0))))
     S.append(shot("factory_grid", A("F42", "$", 0.7), A("F43", "$", 0.6), p=dict(mode="cold"), fadeIn=0.4))
     S.append(shot("homebot", A("F43", "$", 0.6), A("F44", "$", 0.8), fadeIn=0.4))
-    S.append(shot("ending", A("F44", "$", 0.8), END, cues=dict(kitchen=A("F45", "厨房里", -0.2), card=A("F45", "$", 0.9)), fadeIn=0.5))
+    S.append(shot("ending", A("F44", "$", 0.8), END, cues=dict(slip=A("F45", "不会出现", -0.3), place=A("F45", "厨房里", 0.4), card=A("F45", "$", 0.9)), fadeIn=0.5))
     return S
 
 

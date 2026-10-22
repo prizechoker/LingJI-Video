@@ -96,7 +96,7 @@ export async function create({ renderer, scale, p, cues, dur }) {
   sun.shadow.bias = -0.0002;
   st.scene.add(keyL, keyL.target, sun, sun.target);
   st.camera.near = 0.02;
-  grade(st, { ao: { radius: 0.02, intensity: 1.6, falloff: 0.5 }, dof: { distance: 0.5, range: p.range ?? 0.2, bokeh: 3.5 }, bloom: { intensity: 0.4, threshold: 0.9 }, vignette: 0.62, contrast: 0.09, exposure: p.exposure ?? 1.0 });
+  grade(st, { ao: { radius: 0.02, intensity: 1.6, falloff: 0.5 }, dof: { distance: 0.5, range: p.range ?? 0.2, bokeh: 3.5 }, bloom: { intensity: 0.4, threshold: 0.9 }, vignette: 0.62, contrast: 0.09, saturation: -0.1, exposure: p.exposure ?? 1.0 });
 
   const qc = new THREE.Quaternion(), qa = new THREE.Quaternion();
   return {

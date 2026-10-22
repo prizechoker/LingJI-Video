@@ -19,6 +19,8 @@ const CAMS = {
   angle: { pos: [-0.06, 0.4, 0.44], look: [0.03, 0.0, -0.01], fov: 30, to: { pos: [-0.02, 0.34, 0.38], look: [0.05, 0, -0.01] } },
   low: { pos: [-0.33, 0.11, 0.36], look: [0.06, 0.0, -0.02], fov: 26, to: { pos: [-0.26, 0.095, 0.3], look: [0.08, 0.0, -0.02] } },
   edge: { pos: [-0.2, 0.05, 0.2], look: [0.12, 0.0, -0.04], fov: 22, to: { pos: [-0.12, 0.048, 0.24], look: [0.16, 0.0, -0.02] } },
+  // a macro of the stone at P10, from Lee's side, Q11's white stone beside it
+  macro: { pos: [0.04, 0.03, -0.1], look: [0.111, 0.006, 0.0], fov: 15, to: { pos: [0.055, 0.026, -0.078], look: [0.111, 0.006, 0.0] } },
 };
 
 // where a human might play after move 36: a few strong candidates around the fight on the right, a long weak tail
@@ -141,13 +143,13 @@ export async function create({ renderer, scale, p, cues, dur }) {
 
   const cam = CAMS[p.cam || 'top'];
   if (cam.up) st.camera.up.set(...cam.up);
-  const dofOn = p.dof ?? (p.cam === 'edge' || p.cam === 'low');
+  const dofOn = p.dof ?? (p.cam === 'edge' || p.cam === 'low' || p.cam === 'macro');
   grade(st, {
     ao: { radius: 0.02, intensity: 1.6 },
-    dof: dofOn ? { distance: 0.4, range: p.range ?? (p.cam === 'edge' ? 0.025 : 0.08), bokeh: p.bokeh ?? 4 } : null,
+    dof: dofOn ? { distance: 0.4, range: p.range ?? (p.cam === 'edge' ? 0.025 : p.cam === 'macro' ? 0.03 : 0.08), bokeh: p.bokeh ?? 4 } : null,
     bloom: { intensity: mode === 'heat' ? 0.55 : 0.3, threshold: 0.75 }, vignette: 0.68, contrast: 0.12, exposure: p.exposure ?? 0.9,
   });
-  const focus = V3(...(p.focus || (p.cam === 'edge' ? [0.06, 0, 0.0] : [0.08, 0, 0])));
+  const focus = V3(...(p.focus || (p.cam === 'edge' ? [0.06, 0, 0.0] : p.cam === 'macro' ? [0.111, 0.004, 0.0] : [0.08, 0, 0])));
   if (st.dof) st.dof.target = focus;
 
   // the time-lapse: a continuous move count; the newest stone settles in from a few millimetres up

@@ -57,7 +57,7 @@ export function gridFloorMaterial(studio, {
   texture = 'Concrete047A', tile = 4, tint = 0x9aa3ab, roughness = 1.0, normalScale = 0.6,
   cell = [1, 1], origin = [0, 0], lineW = 0.03, paint = 0xdfe6ec, paintA = 0.85, wear = 0.55,
   pools = null, // { pitch: [x, z], offset: [x, z], radius: [x, z], color, intensity }
-  clearcoat = 0.3, clearcoatRoughness = 0.25, texMean = 0x9c9a94, texMix = 1, blotch = 0.3, refl = null,
+  clearcoat = 0.3, clearcoatRoughness = 0.25, texMean = 0x9c9a94, texMix = 1, blotch = 0.3, refl = null, local = 0,
 } = {}) {
   const maps = studio.pbr(texture, { repeat: [1, 1] });
   const mat = new THREE.MeshPhysicalMaterial({
@@ -110,7 +110,7 @@ export function gridFloorMaterial(studio, {
     Object.assign(s.uniforms, U);
     s.vertexShader = s.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vGW;')
-      .replace('#include <project_vertex>', '#include <project_vertex>\nvGW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      .replace('#include <project_vertex>', local ? `#include <project_vertex>\nvGW = transformed * ${local.toFixed(6)};` : '#include <project_vertex>\nvGW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     s.fragmentShader = s.fragmentShader
       .replace('#include <common>', `#include <common>
 varying vec3 vGW;
@@ -231,7 +231,7 @@ roughnessFactor = mix(roughnessFactor, 0.42, gfPaint);
 }
 #include <opaque_fragment>`);
   };
-  mat.customProgramCacheKey = () => 'gridfloor';
+  mat.customProgramCacheKey = () => `gridfloor${local}`;
   return mat;
 }
 

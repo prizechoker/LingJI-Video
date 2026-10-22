@@ -10,14 +10,18 @@
 //                   exposure (ghost arms trail in motion, but at the pickup every copy falls in perfect register).
 //                   A machine readout (X Y Z, never changing) and a cycle counter climbing to 第 1,000 次.
 //                   Cues: `each` (the cycles start racing, 每个零件), `same` (registration marks lock on, 同一个位置).
-// p: mode, exposure, cam ({ pos, look, fov } override for tests), archive (amount, default 1)
+// Cues (seconds from the shot start; defaults relative to dur): work: title (0.5), open (0.22 dur), grip (0.56 dur, never
+// sooner than the die allows), hot (0.8 dur); blind: dark (0.45 dur); repeat: each (0.3 dur), same (0.62 dur).
+// p: mode; look: exposure (1), env (HDRI 0.12), fog (0.06), key (230), rim (160), fill (0.12), heat (casting emissive,
+//    2.2), glow (its light, 2.2), halo (film halation, 1), ghost (repeat ghost opacity, 0.28), archive (1);
+//    cam ({ pos, look, fov } override, for tests)
 import { Studio, THREE, spot } from '../engine2/core.js';
-import { ss, sstep, clamp, lerp, easeOut, easeIn, breathe, grade, caption, text, FONT, measure, toScreen, rng, archive, weave, V3 } from './lib/kit.js';
+import { ss, sstep, clamp, lerp, easeOut, easeIn, breathe, grade, caption, text, FONT, toScreen, rng, archive, weave, V3 } from './lib/kit.js';
 import { factoryMaterials, buildUnimate, buildDieCaster, buildQuench, buildHall, castingGeometry, smokeSystem, reach, DIE, UNI } from './lib/archive_factory.js';
 
 const CAMS = {
   work: { pos: [-3.2, 2.25, 5.5], to: [-1.65, 1.62, 3.15], look: [0.35, 1.05, 0.7], lookTo: [-0.45, 1.36, 1.5], fov: 34, fovTo: 31 },
-  blind: { pos: [0.36, 1.37, -0.06], to: [0.39, 1.35, 0.03], look: [0.7, 1.25, 0.62], lookTo: [0.69, 1.25, 0.6], fov: 36 },
+  blind: { pos: [0.36, 1.37, -0.06], to: [0.39, 1.35, 0.03], look: [0.63, 1.27, 0.62], lookTo: [0.62, 1.27, 0.6], fov: 36 },
   repeat: { pos: [-0.38, 2.7, 0.24], to: [-0.36, 2.66, 0.22], look: [0.7, 1.12, 0.06], lookTo: [0.7, 1.12, 0.06], fov: 27 },
 };
 
@@ -67,6 +71,15 @@ export async function create({ renderer, scale, p, dur, cues }) {
   const glow2 = new THREE.PointLight(0xff6a20, 0, 3, 2); // the shot sleeve's pour hole
   glow2.position.set(-0.6, DIE.y - 0.05, 0.3);
   const hemi = new THREE.HemisphereLight(0x6f8090, 0x1c1a18, p.fill ?? 0.12);
+  key.shadow.normalBias = 0.03;
+  key.shadow.bias = -0.0006;
+  rim.shadow.normalBias = 0.05;
+  rim.shadow.bias = -0.001;
+  if (mode === 'repeat') {
+    // from over the camera's shoulder: lights the die face and keeps its mirror glints off the platen tops
+    key.position.set(-1.3, 6.2, 1.5);
+    key.target.position.set(0.7, 1.2, 0.2);
+  }
   if (mode === 'blind') key.castShadow = false; // too close for its shadow map: let AO do the contact shading
   st.scene.add(key, key.target, rim, rim.target, glow, glow2, hemi);
 
@@ -76,13 +89,13 @@ export async function create({ renderer, scale, p, dur, cues }) {
 
   grade(st, {
     ao: { radius: 0.25, intensity: 1.5, falloff: 1.0 },
-    dof: mode === 'blind' ? { distance: 0.7, range: 0.3, bokeh: 6 } : mode === 'work' ? { distance: 3.5, range: 3.0, bokeh: 3 } : { distance: 2.0, range: 0.7, bokeh: 4 },
+    dof: mode === 'blind' ? { distance: 0.7, range: 0.55, bokeh: 5 } : mode === 'work' ? { distance: 3.5, range: 3.0, bokeh: 3 } : { distance: 2.0, range: 0.7, bokeh: 4 },
     bloom: { intensity: 0.6, threshold: 0.8, radius: 0.8 },
     vignette: 0.5, contrast: 0.1, saturation: -0.05, exposure: p.exposure ?? 1.0,
   });
 
   // ---------------------------------------------------------------- one machine cycle, as a function of time
-  // ev: { open, grip, hot } (absolute times); returns poses for the arm, the die, the casting
+  // c: the cycle's event times (absolute); returns poses for the arm, the die, the casting
   const HOME = { swing: 0.55, pitch: 0.1, ext: 0.02, bend: -0.1, swivel: 0, grip: 0 };
   const AWAY = { swing: 1.3, pitch: 0.15, ext: 0.22, bend: 0.12, swivel: -0.8, grip: 1 };
   const AT = reach(PICK);
@@ -92,9 +105,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     for (const k of Object.keys(a)) o[k] = lerp(a[k], b[k] ?? a[k], u);
     return o;
   };
-  // a full cycle with its own clock: times relative to the cycle's start, scaled by k (1 = the 'work' pace)
   const cycle = (t, c) => {
-    // c: { open, swingIn, extIn, grip, pull, swingOut, close, end }
     let pose = HOME;
     const u1 = ss(clamp((t - c.swingIn[0]) / (c.swingIn[1] - c.swingIn[0])));
     pose = mix(HOME, OUT, u1);
@@ -119,17 +130,23 @@ export async function create({ renderer, scale, p, dur, cues }) {
     const k = clamp(h);
     hotColor.setRGB(1, lerp(0.1, 0.3, k ** 1.5), lerp(0.005, 0.04, k ** 2));
     m.emissive.copy(hotColor);
-    m.emissiveIntensity = (p.heat ?? 2.8) * k ** 1.6;
+    m.emissiveIntensity = (p.heat ?? 2.2) * k ** 1.6;
   };
 
   // ---------------------------------------------------------------- per-mode timing
   const tOpen = cues.open ?? dur * 0.22;
-  const tGrip = cues.grip ?? Math.max(tOpen + 2.2, dur * 0.56);
+  const tGrip0 = cues.grip ?? Math.max(tOpen + 2.2, dur * 0.56);
+  // the die opens (shorter if the grip follows closely); the boom only goes in once the die is open; the arm swings
+  // to the die beforehand (retracted, it clears the platens), so any spacing of the cues stays physical
+  const openDur = clamp(tGrip0 - tOpen - 0.7, 0.45, 1.0);
+  const extStart = Math.max(tGrip0 - 1.15, tOpen + openDur * 0.85);
+  const extEnd = Math.max(extStart + 0.45, tGrip0 - 0.1);
+  const tGrip = extEnd + 0.05;
   const tHot = cues.hot ?? Math.max(tGrip + 1.4, dur * 0.8);
   const workCycle = {
-    open: tOpen, openDur: 1.0,
-    swingIn: [Math.max(tOpen + 0.2, tGrip - 2.6), tGrip - 1.25], extIn: [tGrip - 1.2, tGrip - 0.12],
-    grip: tGrip - 0.05, gripDur: 0.25, pull: [tGrip + 0.35, tGrip + 1.0], swingOut: [tGrip + 0.85, Math.max(tHot + 0.4, tGrip + 2.2)],
+    open: tOpen, openDur,
+    swingIn: [Math.min(extStart - 0.9, tGrip0 - 2.4), extStart], extIn: [extStart, extEnd],
+    grip: tGrip - 0.05, gripDur: 0.22, pull: [tGrip + 0.3, tGrip + 0.95], swingOut: [tGrip + 0.8, Math.max(tHot + 0.4, tGrip + 2.2)],
     close: tGrip + 1.4,
   };
   const tDark = cues.dark ?? dur * 0.45;
@@ -268,7 +285,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
       setHeat(mats.hot, state.heat);
       glow.position.setFromMatrixPosition(casting.matrix).add(V3(-0.04, 0.02, -0.13).applyMatrix4(new THREE.Matrix4().extractRotation(casting.matrix)));
       if (!state.held) glow.position.x -= 0.12;
-      glow.intensity = (p.glow ?? 2.2) * state.heat ** 1.6 * (state.open > 0.05 || state.held ? 1 : 0.15);
+      glow.intensity = (p.glow ?? 2.2) * (mode === 'repeat' ? 0 : 1) * state.heat ** 1.6 * (state.open > 0.05 || state.held ? 1 : 0.15);
       glow2.intensity = mode === 'work' ? 0.4 + 0.1 * Math.sin(t * 7.3) * Math.sin(t * 3.1) : 0;
       halo.a = state.heat ** 1.6 * (state.held ? 1 : sstep(0.1, DIE.open, state.open));
       halo.p = V3().setFromMatrixPosition(casting.matrix).add(V3(0, 0.02, -0.13).applyMatrix4(new THREE.Matrix4().extractRotation(casting.matrix)));
@@ -328,6 +345,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
       pickScreen.y = sp[1];
       if (halo.p && halo.a > 0.01) {
         // how much of the hot part the camera can see (a few rays against the machine and the robot)
+        st.scene.updateMatrixWorld(true); // this frame's poses, never the last frame's
         let vis = 0;
         const dirs = [[0, 0, 0], [0, 0.04, 0.05], [0, -0.04, -0.05], [0, 0.04, -0.05], [0, -0.04, 0.05]];
         for (const d of dirs) {
@@ -340,7 +358,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
           if (!hit.length) vis += 1 / dirs.length;
         }
         halo.a *= vis;
-        if (mode === 'blind') halo.a *= 0.35;
+        if (mode === 'blind') halo.a *= 0.8;
         const hp = toScreen(st.camera, halo.p);
         halo.x = hp[0];
         halo.y = hp[1];
@@ -361,7 +379,8 @@ export async function create({ renderer, scale, p, dur, cues }) {
         g.save();
         g.globalCompositeOperation = 'color';
         const gt = g.createRadialGradient(x, y, 0, x, y, r * 1.3);
-        gt.addColorStop(0, `rgba(255,120,30,${0.8 * Math.min(1, a * 1.5)})`);
+        gt.addColorStop(0, `rgba(255,112,26,${0.95 * Math.min(1, a * 1.5)})`);
+        gt.addColorStop(0.55, `rgba(255,112,26,${0.6 * Math.min(1, a * 1.5)})`);
         gt.addColorStop(1, 'rgba(255,120,30,0)');
         g.fillStyle = gt;
         g.fillRect(x - r * 1.3, y - r * 1.3, r * 2.6, r * 2.6);
@@ -375,8 +394,8 @@ export async function create({ renderer, scale, p, dur, cues }) {
         g.fillRect(x - r * 2.4, y - r * 2.4, r * 4.8, r * 4.8);
         g.restore();
       };
-      hot(halo.x, halo.y, halo.r, halo.a * (mode === 'repeat' ? 0.6 : 1));
-      if (mode === 'repeat' && ghostAmt > 0.01) hot(pickScreen.x, pickScreen.y, halo.r * 0.9, 0.45 * ghostAmt);
+      hot(halo.x, halo.y, halo.r, halo.a * (mode === 'repeat' ? 0.4 : 1));
+      if (mode === 'repeat' && ghostAmt > 0.01) hot(pickScreen.x, pickScreen.y, halo.r * 0.9, 0.35 * ghostAmt);
       if (mode === 'work') {
         const tT = cues.title ?? 0.5;
         const a = sstep(tT, tT + 0.9, t) * (1 - sstep(Math.min(dur - 0.6, tT + 4.5), Math.min(dur, tT + 5.3), t));
@@ -403,7 +422,8 @@ export async function create({ renderer, scale, p, dur, cues }) {
         // registration marks on the pick point
         if (lock > 0.001) {
           const { x, y } = pickScreen;
-          const r0 = lerp(170, 78, ss(lock));
+          const k = ss(lock);
+          const rx = lerp(300, 168, k), ry = lerp(190, 96, k);
           g.save();
           g.globalAlpha *= lock;
           g.strokeStyle = 'rgba(240,206,140,0.95)';
@@ -412,17 +432,20 @@ export async function create({ renderer, scale, p, dur, cues }) {
           g.lineWidth = 2.6;
           for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
             g.beginPath();
-            g.moveTo(x + sx * r0, y + sy * (r0 - 16));
-            g.lineTo(x + sx * r0, y + sy * r0);
-            g.lineTo(x + sx * (r0 - 16), y + sy * r0);
+            g.moveTo(x + sx * rx, y + sy * (ry - 22));
+            g.lineTo(x + sx * rx, y + sy * ry);
+            g.lineTo(x + sx * (rx - 22), y + sy * ry);
             g.stroke();
           }
+          g.lineWidth = 1.6;
           g.beginPath();
-          g.moveTo(x - 10, y);
-          g.lineTo(x + 10, y);
-          g.moveTo(x, y - 10);
-          g.lineTo(x, y + 10);
+          g.moveTo(x - 12, y);
+          g.lineTo(x + 12, y);
+          g.moveTo(x, y - 12);
+          g.lineTo(x, y + 12);
           g.stroke();
+          g.restore();
+          text(g, 'SAME POSITION', x - rx, y - ry - 22, { size: 16, font: FONT.mono, weight: 500, color: [240, 214, 160], a: lock, align: 'left', spacing: 4, shadow: 10 });
           g.restore();
         }
       }

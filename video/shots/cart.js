@@ -3,11 +3,15 @@
 //                  (masking-tape cross on the floor, tally lamp on). Caption "1979 · 斯坦福大学" from cue `title`.
 //         'crawl' (C21) — a locked-off time-lapse down the room: the cart scoots forward in one-metre lurches, its camera
 //                  zipping along the slider, the sun's window patches and the wall clock racing; a large elapsed-time
-//                  readout races 00:00:00 -> 05:00:00 and lands at cue `five`(+~1 s). Then one cycle at a readable
-//                  pace: the last metre (cue `stop`), nine pictures along the slider with a flash each (cue `photo`),
-//                  and the long stillness while the readout races through twelve minutes (cue `think`).
-// p: mode, cam (optional override { pos, look, fov } for tests), exposure, dof (bool, room default true)
-// cues (seconds from the shot start): room: title; crawl: five, stop, photo, think
+//                  readout races 00:00:00 -> 05:00:00 and lands just after cue `five`. Then one cycle at a readable
+//                  pace, the camera panning with it: the last metre (cue `stop`), nine pictures along the slider with a
+//                  flash each (cue `photo`), and the long stillness while the readout races through twelve minutes
+//                  (cue `think`).
+// Cues (seconds from the shot start; defaults relative to dur): room: title (0.6); crawl: five (0.45), stop (0.36 dur),
+// photo (0.56 dur), think (0.76 dur). The total readout lands on 05:00:00 at five + 0.7 s (sooner if stop is close).
+// p: mode; look: exposure (room 1.0, crawl 1.3), env (room-capture environment, 0.55), fill (0.13), sun ({ az, el, I }
+//    override), archive (0.8), dof (bool, room default true), readout ('left' | 'right', crawl, default left);
+//    cam ({ pos, look, fov } override, for tests)
 import { Studio, THREE } from '../engine2/core.js';
 import { ss, sstep, clamp, lerp, easeOut, breathe, grade, caption, text, FONT, measure, rng, archive, weave, V3 } from './lib/kit.js';
 import { buildCart, CART, chairMaterials, buildChair } from './lib/archive_cart.js';
@@ -28,12 +32,12 @@ const CHAIRS = [
   ['steel', -0.45, -4.85, 0.9, { pad: 'vinylOrange', tube: 'chrome' }],
   ['wood', 1.65, -2.05, -0.9, {}],
   ['steel', -0.95, -1.25, 0.8, { pad: 'vinylOlive', tube: 'chrome' }],
-  ['shell', 2.55, -0.55, 3.6, { shell: 'shellBeige', tube: 'tubeBlack' }],
+  ['shell', 3.45, -1.1, 3.6, { shell: 'shellBeige', tube: 'tubeBlack' }],
   ['wood', -2.65, -4.05, 1.9, {}],
   ['steel', 3.15, -3.4, -0.3, { pad: 'vinylOrange', tube: 'chrome' }],
   ['folding', -2.85, -7.35, -1.2, { paint: 'tan' }],
   ['steel', 0.25, -8.25, 0.2, { pad: 'vinylBrown', tube: 'tubeBlack' }],
-  ['folding', 1.95, 0.75, 2.2, { paint: 'tan' }],
+  ['folding', 3.3, 1.9, 2.2, { paint: 'tan' }],
   ['wood', 3.45, -5.85, 0.9, {}],
   ['shell', -2.2, -1.9, -2.6, { shell: 'shellBlue', tube: 'chrome' }],
   ['wood', 3.2, -7.6, 2.6, {}],
@@ -43,8 +47,8 @@ const CHAIRS = [
 ];
 
 const CAMS = {
-  room: { pos: [-0.72, 0.34, -4.0], to: [-0.3, 0.38, -3.57], look: [1.15, 0.44, -5.85], lookTo: [1.2, 0.47, -5.9], fov: 32 },
-  crawl: { pos: [-1.35, 1.38, 1.9], to: [-1.05, 1.28, 1.35], look: [0.3, 0.4, -3.0], lookTo: [0.3, 0.42, -1.05], fov: 36 },
+  room: { pos: [0.85, 0.52, -2.45], to: [1.75, 0.6, -2.75], look: [1.05, 0.48, -5.9], lookTo: [1.2, 0.5, -5.9], fov: 32 },
+  crawl: { pos: [2.35, 1.42, 1.95], to: [2.12, 1.36, 1.6], look: [0.25, 0.4, -3.0], lookTo: [0.15, 0.29, -1.35], fov: 36 },
 };
 
 const HMS = (sec) => {
@@ -107,7 +111,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     return t;
   })();
   const glint = new THREE.Sprite(new THREE.SpriteMaterial({ map: glintTex, color: new THREE.Color(4, 4, 4), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
-  glint.scale.set(0.05, 0.05, 0.05);
+  glint.scale.set(0.09, 0.09, 0.09);
   st.scene.add(glint);
 
   // the room's own light as the environment (captured once, mid-room, cart and flash hidden)
@@ -251,9 +255,11 @@ export async function create({ renderer, scale, p, dur, cues }) {
       cart.pose({ roll: s, steerA: clamp(pp.steer, -0.45, 0.45), slide: slideAt(t), pitch, sway: [sway0, sway1], lamp: mode === 'room' ? 0.7 : 0.35 + 0.65 * fl });
       cart.group.updateMatrixWorld(true);
       const lens = cart.lensWorld();
-      flash.position.copy(lens);
-      flash.intensity = 2.5 * fl;
-      glint.position.copy(lens);
+      const fwd = V3(0, 0, 1).transformDirection(cart.camera.matrixWorld);
+      // the burst lights what the camera looks at, not the camera itself
+      flash.position.copy(lens).addScaledVector(fwd, 0.45);
+      flash.intensity = 3.0 * fl;
+      glint.position.copy(lens).addScaledVector(fwd, 0.012);
       glint.material.opacity = Math.min(1, fl * 1.2);
       glint.visible = fl > 0.01;
       // ---- light and time
@@ -265,7 +271,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
       // ---- camera
       // room: one slow move over the shot; crawl: locked off for the time-lapse, then a follow pan with the last metre
       // and a slow push through the pictures and the thinking
-      const r = mode === 'room' ? ss(clamp(t / dur)) : ss(clamp((t - m0 + 0.2) / Math.max(1, dur - m0 + 0.2)));
+      const r = mode === 'room' ? ss(easeOut(clamp(t / dur), 1.6)) : ss(clamp((t - m0 + 0.2) / Math.max(1, dur - m0 + 0.2)));
       const rl = mode === 'room' ? r : ss(clamp((t - m0 + 0.15) / (m1 - m0 + 0.75)));
       const pos = cam.pos.map((v, i) => lerp(v, (cam.to || cam.pos)[i], r));
       const look = cam.look.map((v, i) => lerp(v, (cam.lookTo || cam.look)[i], rl));

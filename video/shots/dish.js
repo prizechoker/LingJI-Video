@@ -171,7 +171,7 @@ export async function create({ renderer, scale, p, cues, dur }) {
   st.scene.add(key, key.target);
 
   st.camera.near = 0.02;
-  grade(st, { ao: { radius: 0.02, intensity: 1.6, falloff: 0.5 }, dof: { distance: 0.5, range: p.range ?? 0.16, bokeh: 3.5 }, bloom: { intensity: 0.4, threshold: 0.9 }, vignette: 0.6, contrast: 0.09, saturation: 0.0, exposure: p.exposure ?? 1.0 });
+  grade(st, { ao: { radius: 0.02, intensity: 1.6, falloff: 0.5 }, dof: { distance: 0.5, range: p.range ?? 0.16, bokeh: 3.5 }, bloom: { intensity: 0.4, threshold: 0.9 }, vignette: 0.6, contrast: 0.09, saturation: -0.12, exposure: p.exposure ?? 1.0 });
 
   const tSlip = cues.slip ?? 0.5;
   const slow = cues.impact != null ? Math.max(2, (cues.impact - tSlip) / uHit) : p.slow ?? 7;

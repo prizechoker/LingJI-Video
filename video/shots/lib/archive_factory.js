@@ -13,6 +13,44 @@ export const UNI = { at: V(DIE.open - DIE.eject - 0.012, 0, 2.25), BH: 0.9, pivo
 
 // ---------------------------------------------------------------- materials
 
+// a pressure gauge dial: ticks, numerals, a needle (seen at an angle, never read)
+function gaugeTexture() {
+  const n = 256;
+  const c = canvas(n, n);
+  const g = c.getContext('2d');
+  g.fillStyle = '#e8e2d2';
+  g.fillRect(0, 0, n, n);
+  g.translate(n / 2, n / 2);
+  g.strokeStyle = '#1c1c1c';
+  for (let k = 0; k <= 40; k++) {
+    const a = -Math.PI * 1.25 + (k / 40) * Math.PI * 1.5;
+    g.lineWidth = k % 5 ? 2 : 4;
+    g.beginPath();
+    g.moveTo(Math.cos(a) * 100, Math.sin(a) * 100);
+    g.lineTo(Math.cos(a) * (k % 5 ? 88 : 80), Math.sin(a) * (k % 5 ? 88 : 80));
+    g.stroke();
+  }
+  g.fillStyle = '#1c1c1c';
+  g.font = '600 22px sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  for (let k = 0; k <= 8; k++) {
+    const a = -Math.PI * 1.25 + (k / 8) * Math.PI * 1.5;
+    g.fillText(String(k * 250), Math.cos(a) * 62, Math.sin(a) * 62);
+  }
+  g.strokeStyle = '#7a1a12';
+  g.lineWidth = 5;
+  g.beginPath();
+  g.moveTo(0, 0);
+  g.lineTo(Math.cos(-0.3) * 92, Math.sin(-0.3) * 92);
+  g.stroke();
+  g.fillStyle = '#222';
+  g.beginPath();
+  g.arc(0, 0, 10, 0, Math.PI * 2);
+  g.fill();
+  return canvasTex(c);
+}
+
 // a grime multiplier: soft dark blotches and fine speckle, darker toward the texture's bottom edge
 function grimeTexture(seed = 8) {
   const n = 512;
@@ -56,10 +94,10 @@ export function factoryMaterials(st) {
     machine: M({ map: grime, color: 0x58655d, metalness: 0.35, roughness: 0.5, roughnessMap: worn.roughnessMap, clearcoat: 0.2, clearcoatRoughness: 0.5 }),
     machineDark: M({ color: 0x2e3532, metalness: 0.35, roughness: 0.55 }),
     chrome: M({ color: 0xd8dde0, metalness: 1, roughness: 0.12 }),
-    die: M({ ...worn, color: 0x8a8c8c, metalness: 0.85, roughness: 0.62 }),
+    die: M({ ...worn, color: 0x8a8c8c, metalness: 0.7, roughness: 0.78 }),
     dieFace: M({ color: 0x4c4945, metalness: 0.6, roughness: 0.8 }),
     oily: M({ color: 0x1a1816, metalness: 0.2, roughness: 0.25, clearcoat: 0.6, clearcoatRoughness: 0.2 }),
-    gauge: M({ color: 0xe6e1d2, roughness: 0.4 }),
+    gauge: M({ map: gaugeTexture(), color: 0xd8d2c2, roughness: 0.35 }),
     glass: M({ color: 0x111316, roughness: 0.05, metalness: 0.1, clearcoat: 1, transparent: true, opacity: 0.35 }),
     yellow: M({ color: 0xa88a2a, roughness: 0.55 }),
     tank: M({ color: 0x3a3f3c, metalness: 0.4, roughness: 0.55, roughnessMap: worn.roughnessMap }),

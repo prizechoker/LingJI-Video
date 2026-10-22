@@ -19,7 +19,7 @@ import { ss, sstep, clamp, lerp, key, breathe, grade, caption, V3, rng } from '.
 
 const CAMS = {
   grid: { pos: [2.05, 1.42, 2.75], look: [-0.35, 0.72, -0.6], fov: 42, to: { pos: [1.85, 1.38, 2.45], look: [-0.35, 0.74, -0.6] } },
-  days: { pos: [1.45, 1.3, 2.0], look: [0.55, 0.95, -0.8], fov: 36, to: { pos: [1.4, 1.28, 1.88], look: [0.55, 0.95, -0.8] } },
+  days: { pos: [1.22, 1.2, 2.2], look: [0.75, 0.9, -0.6], fov: 36, to: { pos: [1.16, 1.19, 2.06], look: [0.75, 0.9, -0.6] } },
 };
 
 // a fruit: a slightly squashed sphere with a little colour variation (apples, mandarins)
@@ -37,7 +37,7 @@ function fruit(kind, seed) {
 
 export async function create({ renderer, scale, p, dur, cues }) {
   const st = new Studio({ scale, renderer });
-  const env = await st.hdri('../assets/hdri/comfy_cafe_2k.hdr', { intensity: p.env ?? 0.22, rotation: p.rot ?? 0 });
+  const env = await st.hdri('../assets/hdri/comfy_cafe_2k.hdr', { intensity: p.env ?? 0.16, rotation: p.rot ?? 0 });
   st.scene.background = new THREE.Color(0x000000);
   const H = await buildHome(st, env);
   st.scene.add(H.group);
@@ -112,8 +112,8 @@ export async function create({ renderer, scale, p, dur, cues }) {
     const across = new THREE.Vector3(...W(1, 0, 0)).sub(new THREE.Vector3(...W(0, 0, 0))).normalize();
     const normal = across.clone().cross(along).normalize();
     const sim = simulateSweater({
-      colliders: cols, T: 2.0,
-      start: { origin: rail.clone().add(new THREE.Vector3(0.63, 0.36, 0.04)).toArray(), across: across.toArray(), along: along.toArray(), normal: normal.toArray(), vel: [-1.9, 0.6, -0.08], spin: 1.0 },
+      colliders: cols, T: 2.6,
+      start: { origin: rail.clone().add(new THREE.Vector3(0.8, 0.4, 0.04)).toArray(), across: across.toArray(), along: along.toArray(), normal: normal.toArray(), vel: [-2.2, 0.75, -0.08], spin: 1.0 },
     });
     if (p.debug) {
       for (const fi of [0, 15, 30, 45, 60, 90, 119]) {
@@ -227,7 +227,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     st.scene.updateMatrixWorld(true);
     const box = { x0: -2.3, x1: 2.35, z0: -1.42, z1: 2.6 };
     const hf = heightField(renderer, st.scene, { ...box, res: 512, hide: H.overhead });
-    grid = lightGrid(hf, { ...box, step: 0.25, ds: 0.02, scale });
+    grid = lightGrid(hf, { ...box, step: 0.28, ds: 0.02, scale });
     st.scene.add(grid.obj);
   }
 
@@ -239,7 +239,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     vignette: 0.6, contrast: 0.1, saturation: 0.0, exposure: p.exposure ?? 1.0,
   });
   if (st.aoPass) Object.assign(st.aoPass.configuration, { aoSamples: p.aos ?? 8, denoiseSamples: p.dns ?? 4, denoiseRadius: 8 });
-  if (st.dof) st.dof.target = mode === 'grid' ? V3(-0.1, T, -0.1) : V3(0.55, T, -0.2);
+  if (st.dof) st.dof.target = mode === 'grid' ? V3(-0.1, T, -0.1) : V3(0.75, T, -0.1);
 
   return {
     studio: st,
@@ -275,7 +275,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
         names.forEach(([zh, en], k) => {
           const t0 = tDays + k * span - (k ? XF / 2 : 0), t1 = tDays + (k + 1) * span - XF / 2;
           const a = sstep(t0, t0 + 0.18, t) * (k === 2 ? 1 : 1 - sstep(t1, t1 + 0.18, t));
-          caption(g, 150, 190, { en, zh, a, color: [246, 232, 208], zhSize: 46, enSize: 14, rule: 120 });
+          caption(g, 1470, 205, { en, zh, a, color: [248, 236, 214], zhSize: 50, enSize: 15, rule: 130 });
         });
       }
     },

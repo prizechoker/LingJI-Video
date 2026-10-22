@@ -64,12 +64,15 @@ export function simulateSweater({ colliders, start, seed = 7, T = 1.8, fps = 60,
   const { origin, across, along, normal, vel, spin } = start;
   const nv = new THREE.Vector3(...normal), rv = new THREE.Vector3(), wv = new THREE.Vector3();
   for (let k = 0; k < n; k++) {
-    const px = P[k * 3], py = P[k * 3 + 1] - 0.33;
+    // bunched up as it leaves the hand: the sleeves folded in over the body, the hem turned up a little
+    let px = P[k * 3], py = P[k * 3 + 1] - 0.33, lift = 0;
+    if (Math.abs(px) > 0.24) { px = Math.sign(px) * (0.24 - (Math.abs(px) - 0.24) * 0.9); lift = 0.035; py -= 0.04; }
+    if (py < -0.22) { py = -0.22 - (py + 0.22) * 0.8; lift += 0.03; }
     const crumple = 0.02 * Math.sin(px * 9 + 1) * Math.cos(py * 7) + 0.012 * Math.sin(py * 13 + px * 4) + (R() - 0.5) * 0.004;
     rv.set(across[0] * px + along[0] * py, across[1] * px + along[1] * py, across[2] * px + along[2] * py);
     wv.copy(nv).multiplyScalar(spin).cross(rv);  // a little spin about the sweater's normal
     for (let c = 0; c < 3; c++) {
-      const w = origin[c] + rv.getComponent(c) + normal[c] * crumple;
+      const w = origin[c] + rv.getComponent(c) + normal[c] * (crumple + lift);
       X[k * 3 + c] = w;
       Xp[k * 3 + c] = w - (vel[c] + wv.getComponent(c)) / 600;
     }
@@ -78,13 +81,15 @@ export function simulateSweater({ colliders, start, seed = 7, T = 1.8, fps = 60,
   const g = -9.81;
   const frames = [];
   const contact = new Uint8Array(n);
+  const cn = [0, 1, 0];
+  const mu = 0.85;
   const solveColliders = () => {
     for (let k = 0; k < n; k++) {
       let x = X[k * 3], y = X[k * 3 + 1], z = X[k * 3 + 2];
       let hit = 0;
       for (const C of colliders) {
         if (C.type === 'floor') {
-          if (y < C.y + 0.004) { y = C.y + 0.004; hit = 1; }
+          if (y < C.y + 0.004) { y = C.y + 0.004; hit = 1; cn[0] = 0; cn[1] = 1; cn[2] = 0; }
         } else if (C.type === 'capsule') {
           // closest point on the segment a..b
           const ax = C.a[0], ay = C.a[1], az = C.a[2];
@@ -93,7 +98,7 @@ export function simulateSweater({ colliders, start, seed = 7, T = 1.8, fps = 60,
           const cx = ax + bx * t, cy = ay + by * t, cz = az + bz * t;
           const dx = x - cx, dy = y - cy, dz = z - cz;
           const L = Math.hypot(dx, dy, dz), r = C.r + 0.005;
-          if (L < r && L > 1e-6) { x = cx + (dx / L) * r; y = cy + (dy / L) * r; z = cz + (dz / L) * r; hit = 1; }
+          if (L < r && L > 1e-6) { x = cx + (dx / L) * r; y = cy + (dy / L) * r; z = cz + (dz / L) * r; hit = 1; cn[0] = dx / L; cn[1] = dy / L; cn[2] = dz / L; }
         } else if (C.type === 'box') {
           // world-aligned box (min, max): push out along the shallowest axis
           if (x > C.min[0] && x < C.max[0] && y > C.min[1] && y < C.max[1] && z > C.min[2] && z < C.max[2]) {
@@ -102,11 +107,21 @@ export function simulateSweater({ colliders, start, seed = 7, T = 1.8, fps = 60,
             const [dd, ax, s] = pen[0];
             if (ax === 0) x += s * (dd + 0.004); else if (ax === 1) y += s * (dd + 0.004); else z += s * (dd + 0.004);
             hit = 1;
+            cn[0] = ax === 0 ? s : 0; cn[1] = ax === 1 ? s : 0; cn[2] = ax === 2 ? s : 0;
           }
         }
       }
+      if (hit) {
+        // friction (wool on wood): take away most of the sliding since the last step
+        const px = Xp[k * 3], py = Xp[k * 3 + 1], pz = Xp[k * 3 + 2];
+        let dx = x - px, dy = y - py, dz = z - pz;
+        const [nx, ny, nz] = hit === 1 ? cn : [0, 1, 0];
+        const dn = dx * nx + dy * ny + dz * nz;
+        dx -= dn * nx; dy -= dn * ny; dz -= dn * nz;
+        x -= mu * dx; y -= mu * dy; z -= mu * dz;
+      }
       X[k * 3] = x; X[k * 3 + 1] = y; X[k * 3 + 2] = z;
-      contact[k] = hit;
+      contact[k] = hit ? 1 : 0;
     }
   };
   for (let s = 0; s <= steps; s++) {
@@ -115,7 +130,7 @@ export function simulateSweater({ colliders, start, seed = 7, T = 1.8, fps = 60,
     for (let k = 0; k < n; k++) {
       for (let c = 0; c < 3; c++) {
         const i = k * 3 + c;
-        const v = (X[i] - Xp[i]) * (contact[k] ? 0.55 : 0.996);  // friction where it touches something
+        const v = (X[i] - Xp[i]) * (contact[k] ? 0.55 : 0.9993);  // friction where it touches something
         Xp[i] = X[i];
         X[i] += v + (c === 1 ? g * dt * dt : 0);
       }
@@ -138,7 +153,7 @@ export function simulateSweater({ colliders, start, seed = 7, T = 1.8, fps = 60,
 }
 
 // the thick knit mesh: an outer and an inner layer (offset along the normals) and a band along the open edges
-export function sweaterMesh(sim, mat, { thick = 0.007 } = {}) {
+export function sweaterMesh(sim, mat, { thick = 0.013 } = {}) {
   const { n, tris } = sim;
   // boundary edges (used by one triangle)
   const ec = new Map();

@@ -41,7 +41,7 @@ function sparkColor(u, out) {
 
 // a spark field. emitters: [{ tip(b) -> Vector3 (where the spark is born at time b), on(b) -> 0..1 (welding?),
 //   rate (sparks/s), seed, ground(x, z) -> y (optional), spread (0..1), dir: Vector3 (bias, optional) }]
-export function sparkField({ max = 2400, gain = 30, shutter = 1 / 48, minPx = 1.3, scale = 1 } = {}) {
+export function sparkField({ max = 2400, gain = 30, shutter = 1 / 36, minPx = 1.3, scale = 1 } = {}) {
   const geo = new THREE.CylinderGeometry(1, 1, 1, 5, 1, true).translate(0, -0.5, 0); // unit streak from 0 to -y
   const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false });
   const mesh = new THREE.InstancedMesh(geo, mat, max);
@@ -53,26 +53,31 @@ export function sparkField({ max = 2400, gain = 30, shutter = 1 / 48, minPx = 1.
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), v = new THREE.Vector3(), Yn = new THREE.Vector3(0, -1, 0), col = [0, 0, 0];
   const camP = new THREE.Vector3();
   // position + velocity of a spark tau seconds after birth, with up to two bounces
+  // position + velocity of a spark tau seconds after birth, one lively bounce, then it skids and dies;
+  // returns the time since its first touch-down (0 while still in the air)
   function flight(p0, v0, tau, ground, out, vout) {
-    let x = p0.x, y = p0.y, z = p0.z, vx = v0.x, vy = v0.y, vz = v0.z, t = tau;
-    for (let b = 0; b < 3; b++) {
+    let x = p0.x, y = p0.y, z = p0.z, vx = v0.x, vy = v0.y, vz = v0.z, t = tau, landed = 0;
+    for (let b = 0; b < 2; b++) {
       const gy = ground ? ground(x, z) : 0;
-      // time to reach gy: y + vy s - G s^2 / 2 = gy
       const disc = vy * vy + 2 * G * (y - gy);
       const s = disc >= 0 ? (vy + Math.sqrt(disc)) / G : Infinity;
-      if (t <= s || b === 2) {
-        if (b === 2) { out.set(x, gy + 0.002, z); vout.set(0, 0, 0); return; }
+      if (t <= s) {
         out.set(x + vx * t, y + vy * t - 0.5 * G * t * t, z + vz * t);
         vout.set(vx, vy - G * t, vz);
-        return;
+        return landed;
       }
-      // bounce: lose most of the energy, skitter along
       x += vx * s; z += vz * s; y = gy + 0.001;
       const vyh = vy - G * s;
-      vy = -0.3 * vyh; vx *= 0.55; vz *= 0.55;
+      vy = -0.28 * vyh; vx *= 0.5; vz *= 0.5;
       t -= s;
-      if (b === 1) { vy = 0; vx *= 0.5; vz *= 0.5; }
+      landed += s;
+      if (b === 1) break;
     }
+    // skidding to a stop
+    const k = Math.min(t, 0.25);
+    out.set(x + vx * k * 0.5, (ground ? ground(x, z) : 0) + 0.002, z + vz * k * 0.5);
+    vout.set(vx * (1 - k * 4), 0, vz * (1 - k * 4));
+    return tau - t + 1e-3;
   }
   const p0 = new THREE.Vector3(), v0 = new THREE.Vector3();
   mesh.userData.update = (t, emitters, camera) => {
@@ -97,9 +102,11 @@ export function sparkField({ max = 2400, gain = 30, shutter = 1 / 48, minPx = 1.
         v0.set(Math.cos(th) * Math.cos(el), Math.sin(el), Math.sin(th) * Math.cos(el)).multiplyScalar(sp);
         if (e.dir) v0.addScaledVector(e.dir, sp * 0.5);
         p0.copy(e.tip(b));
-        flight(p0, v0, tau * (e.slow ?? 1), e.ground, p, v);
+        const touch = flight(p0, v0, tau * (e.slow ?? 1), e.ground, p, v);
         const speed = v.length();
-        const u = tau / life;
+        // once down a spark cools fast
+        const u = Math.min(1, tau / life + (touch > 0 ? (tau - touch) * 2.5 : 0));
+        if (u >= 1) continue;
         sparkColor(u, col);
         // streak length: the distance covered while the shutter is open (min a couple of mm)
         const len = Math.max(0.004 * scale, speed * shutter * (e.slow ?? 1));

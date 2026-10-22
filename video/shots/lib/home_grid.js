@@ -147,11 +147,12 @@ export function lightGrid(hf, { x0, x1, z0, z1, step = 0.25, ds = 0.02, scale = 
       const [x, z, id, u] = pts[k];
       // buckling: the lines wander and kink where they ride over clutter
       const over = clamp((base[k] - 0.03) / 0.3);
-      const w1 = Math.sin(u * 37 + id * 1.7 + t * 5.3) * 0.5 + Math.sin(u * 91 + id * 0.6 - t * 7.1) * 0.5;
-      const kink = strain * (0.012 + 0.05 * over);
+      // buckling: a few broad waves along each line (as if compressed), sharper where it rides over clutter
+      const w1 = Math.sin(u * 19 + id * 1.7 + t * 2.3) * 0.7 + Math.sin(u * 47 + id * 0.6 - t * 3.1) * 0.3;
+      const kink = strain * (0.01 + 0.035 * over);
       X[k] = x + (id % 2 ? 1 : 0.3) * kink * w1;
-      Z[k] = z + (id % 2 ? 0.3 : 1) * kink * Math.sin(u * 53 + id * 2.3 + t * 6.1);
-      Y[k] = Math.max(s.level, base[k]) + strain * 0.02 * over * Math.sin(u * 61 + id + t * 9);
+      Z[k] = z + (id % 2 ? 0.3 : 1) * kink * Math.sin(u * 23 + id * 2.3 + t * 2.7);
+      Y[k] = Math.max(s.level, base[k]) + strain * 0.015 * (0.3 + over) * Math.abs(Math.sin(u * 29 + id + t * 3));
     }
     const brk = s.brk ?? -1;
     const flick = (f) => (strain > 0.2 ? 0.75 + 0.25 * Math.sin(t * 31 + f.flick * 5) : 1);

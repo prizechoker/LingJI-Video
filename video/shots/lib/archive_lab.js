@@ -456,9 +456,9 @@ export function buildLab(st, { paint = [204, 203, 184] } = {}) {
   W.box('conduit', [0.1, 0.12, 0.05], [2.6, 1.25, z0 + 0.03]);
   W.box('beige', [0.07, 0.11, 0.008], [2.6, 1.25, z0 + 0.058]);
   // a cork board with papers on the left wall
-  W.box('cork', [0.02, 0.9, 1.4], [x0 + 0.01, 1.6, -5.2]);
+  W.box('cork', [0.02, 0.9, 1.4], [x0 + 0.01, 1.6, 2.6]);
   const RP = rng(31);
-  for (let k = 0; k < 7; k++) W.box('paper', [0.003, 0.28, 0.215], [x0 + 0.022, 1.35 + RP() * 0.5, -5.75 + k * 0.17 + RP() * 0.05], { rot: [(RP() - 0.5) * 0.08, 0, 0] });
+  for (let k = 0; k < 7; k++) W.box('paper', [0.003, 0.28, 0.215], [x0 + 0.022, 1.35 + RP() * 0.5, 2.05 + k * 0.17 + RP() * 0.05], { rot: [(RP() - 0.5) * 0.08, 0, 0] });
   // steel desk with a terminal, against the left wall
   const dx = x0 + 0.42, dz = -2.8;
   W.box('deskTop', [0.78, 0.035, 1.5], [dx, 0.745, dz], { bevel: 0.004 });

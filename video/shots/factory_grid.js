@@ -29,7 +29,7 @@ function boardCookie(hx, hy) {
   const g = c.getContext('2d');
   g.fillStyle = '#000';
   g.fillRect(0, 0, N, N);
-  g.filter = `blur(${N * 0.07}px)`;
+  g.filter = `blur(${N * 0.035}px)`;
   g.fillStyle = '#fff';
   const w = hx * N, h = hy * N;
   g.beginPath();
@@ -102,7 +102,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     flanges = flangeSet(pos.length, { fall: 2.2 });
     // a cold light over the board, shaped by a soft rectangular cookie to the board's footprint
     boardSpot = spot(0xdfe9ff, 0, { pos: [BOARD_C.x + 0.6, 24, BOARD_C.y + 1.2], target: [BOARD_C.x, 0, BOARD_C.y], angle: Math.atan(7.6 / 24), penumbra: 0.0, shadow: 2048, radius: 3, near: 10, far: 40 });
-    boardSpot.map = boardCookie(5.9 / 7.6, 6.2 / 7.6);
+    boardSpot.map = boardCookie(10.0 / 15.2, 10.7 / 15.2); // the board + a margin, of the cone's 15.2 m square
     boardSpot.shadow.camera.up.set(0, 0, -1);
     st.scene.add(boardSpot, boardSpot.target);
     st.scene.add(flanges.group);

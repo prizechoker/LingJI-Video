@@ -133,9 +133,9 @@ export function homeMaterials(st, env) {
     for (const k of ['map', 'normalMap', 'roughnessMap']) t[k].anisotropy = aniso;
     return t;
   };
-  const wall = P('PaintedPlaster017', { repeat: [0.45, 0.45] }, 1);
-  M.wall = new THREE.MeshStandardMaterial({ ...wall, color: 0xf3eadb, roughness: 0.92, normalScale: new THREE.Vector2(0.5, 0.5) });
-  M.wallBack = new THREE.MeshStandardMaterial({ ...wall, color: 0xefe2cc, roughness: 0.92, normalScale: new THREE.Vector2(0.5, 0.5) });
+  const wall = P('PaintedPlaster017', { repeat: [0.8, 0.8] }, 1);
+  M.wall = new THREE.MeshStandardMaterial({ ...wall, color: 0xf3eadb, roughness: 0.92, normalScale: new THREE.Vector2(0.3, 0.3) });
+  M.wallBack = new THREE.MeshStandardMaterial({ ...wall, color: 0xefe2cc, roughness: 0.92, normalScale: new THREE.Vector2(0.3, 0.3) });
   M.ceiling = new THREE.MeshStandardMaterial({ color: 0xe9e4da, roughness: 0.95 });
   const fl = P('WoodFloor051', { repeat: [0.42, 0.42] }, 4);
   M.floor = new THREE.MeshStandardMaterial({ ...fl, color: 0xc9b29c, roughness: 0.62 });
@@ -149,8 +149,11 @@ export function homeMaterials(st, env) {
   M.rug = new THREE.MeshStandardMaterial({ ...rug, color: 0xc9b29a, roughness: 1, normalScale: new THREE.Vector2(0.8, 0.8) });
   const lin = P('Fabric082A', { repeat: [3, 3] }, 1);
   M.linen = new THREE.MeshStandardMaterial({ ...lin, color: 0xf4ede2, roughness: 0.95, side: THREE.DoubleSide, normalScale: new THREE.Vector2(0.4, 0.4) });
-  M.seat = new THREE.MeshPhysicalMaterial({ ...P('Fabric030', { repeat: [4, 4] }, 1), color: 0xe0cfb4, roughness: 1, sheen: 0.5, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xd8c8b0) });
-  M.brass = new THREE.MeshStandardMaterial({ color: 0xcfa968, metalness: 1, roughness: 0.32, envMap: env, envMapIntensity: 1.2 });
+  M.seat = new THREE.MeshPhysicalMaterial({ ...P('Fabric082A', { repeat: [4, 4] }, 1), color: 0xd8c4a4, roughness: 1, sheen: 0.5, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xd8c8b0) });
+  const br = st.pbr('Metal048C', { repeat: [0.6, 0.6] });
+  M.brass = new THREE.MeshStandardMaterial({ ...br, color: 0xd9bf8c, metalness: 1, roughness: 0.55, normalScale: new THREE.Vector2(0.25, 0.25), envMap: env, envMapIntensity: 1.3 });
+  const dw = P('Wood026', { repeat: [1.2, 1.2] }, 4);
+  M.doorWood = new THREE.MeshPhysicalMaterial({ ...dw, color: 0xc89470, roughness: 0.48, clearcoat: 0.35, clearcoatRoughness: 0.3, normalScale: new THREE.Vector2(0.4, 0.4) });
   M.black = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.6, roughness: 0.45 });
   M.glass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.1, envMap: env, envMapIntensity: 1.5, depthWrite: false });
   return M;
@@ -530,10 +533,10 @@ export function tableLamp(M, { h = 0.52, color = 0x9aa58c } = {}) {
 // the pendant over the table: a spun steel dome (deep green outside, white inside), cord to the ceiling
 export function pendant(M, { y = 1.52 } = {}) {
   const g = new THREE.Group();
-  const outer = new THREE.MeshPhysicalMaterial({ color: 0x2d3d33, metalness: 0.3, roughness: 0.35, clearcoat: 0.7, clearcoatRoughness: 0.15 });
+  const outer = new THREE.MeshPhysicalMaterial({ color: 0xe8e0d0, metalness: 0.0, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.1 });
   const inner = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffc98a, emissiveIntensity: 0.9, roughness: 0.6, side: THREE.BackSide });
   const prof = [[0.25, 0.0], [0.235, 0.05], [0.19, 0.12], [0.11, 0.19], [0.06, 0.225], [0.045, 0.24], [0.02, 0.24]];
-  const dome = mesh(lathe(prof, 64), outer, { cast: true, receive: false });
+  const dome = mesh(lathe(prof, 64), outer, { cast: false, receive: false });
   const dIn = mesh(lathe(prof.map(([r, yy]) => [r - 0.002, yy]), 64), inner, { cast: false, receive: false });
   g.add(dome, dIn);
   const rim = mesh(new THREE.TorusGeometry(0.25, 0.003, 8, 64), M.brass, { cast: false });
@@ -545,7 +548,7 @@ export function pendant(M, { y = 1.52 } = {}) {
   const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, ROOM.h - y - 0.24, 6), M.black);
   cord.position.y = 0.24 + (ROOM.h - y - 0.24) / 2;
   g.add(cord);
-  const rose = mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.025, 32), outer);
+  const rose = mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.025, 32), outer, { cast: false });
   rose.position.y = ROOM.h - y - 0.0125;
   g.add(rose);
   g.position.y = y;
@@ -810,8 +813,7 @@ export function sideTable(M, { r = 0.24, h = 0.56 } = {}) {
 // a four-panel oak door, w x h, hinge side at x = 0, latch side at x = w; the face toward +z; lever handle both sides
 export function door(M, { w = 0.84, h = 2.04, t = 0.04, handle = 'brass' } = {}) {
   const g = new THREE.Group();
-  const wood = M.oak.clone();
-  wood.color = new THREE.Color(0xd2a87e);
+  const wood = M.doorWood;
   const st = 0.12, rail = 0.12, mid = 0.2;
   const pieces = [
     [st, h, 0, h / 2, 0], [st, h, w - st, h / 2, 0],                  // stiles
@@ -1011,15 +1013,14 @@ export async function buildHome(st, env, { hall = true, bake: bakeIt = true } = 
     runner.position.set((dr.x0 + dr.x1) / 2 + 0.25, 0.004, (z0 + hz0) / 2 - 0.2);
     g.add(runner);
     // the door, swung open into the hall against its right wall
+    // the door, swung open into the hall on its left-hand hinges, edge-on to the room
     const d = door(M, { w: dr.x1 - dr.x0 - 0.01, h: dr.h - 0.01 });
-    d.rotation.y = Math.PI / 2 + 0.12;
-    d.position.set(dr.x1 - 0.02, 0.005, z0 - jd + 0.005);
+    d.rotation.y = Math.PI / 2 - 0.1;
+    d.position.set(dr.x0 + 0.03, 0.005, z0 - jd + 0.005);
     g.add(d);
     parts.door = d;
     // a faint cool window light at the hall's end (a glazed door to a balcony)
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.9), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.1, 0.13, 0.19) }));
-    glow.position.set((hx0 + hx1) / 2 + 0.2, 1.05, hz0 + 0.01);
-    g.add(glow);
+
   }
 
   // the dining table and chairs
@@ -1133,7 +1134,7 @@ export function homeLights(st, H, k = {}) {
   if (!RAL) { RectAreaLightUniformsLib.init(); RAL = true; }
   const L = {};
   const pp = H.anchors.pendant;
-  L.pendant = spot(0xffc68e, 16 * (k.pendant ?? 1), { pos: [pp.x, pp.y, pp.z], target: [pp.x, 0, pp.z], angle: 1.05, penumbra: 0.75, shadow: 2048, near: 0.05, far: 3, bias: -0.0004 });
+  L.pendant = spot(0xffc68e, 16 * (k.pendant ?? 1), { pos: [pp.x, pp.y, pp.z], target: [pp.x, 0, pp.z], angle: 0.85, penumbra: 0.8, shadow: 2048, near: 0.05, far: 3, bias: -0.0004 });
   L.pendant.shadow.normalBias = 0.01;
   L.lamp = new THREE.PointLight(0xffb870, 1.6 * (k.lamp ?? 1), 0, 2);
   L.lamp.position.copy(H.anchors.lampBulb);
@@ -1148,7 +1149,7 @@ export function homeLights(st, H, k = {}) {
     st.scene.add(L.window.target);
   }
   const lb = H.anchors.lamp2Bulb;
-  L.corner = spot(0xffb36a, 9 * (k.corner ?? 1), { pos: [lb.x, lb.y, lb.z], target: [0.4, 0.9, -1.2], angle: 0.75, penumbra: 0.9, shadow: 2048, near: 0.1, far: 7, bias: -0.0005 });
+  L.corner = spot(0xffb36a, 16 * (k.corner ?? 1), { pos: [lb.x, lb.y, lb.z], target: [0.4, 0.9, -1.2], angle: 0.75, penumbra: 0.9, shadow: 2048, near: 0.1, far: 7, bias: -0.0005 });
   L.corner.shadow.normalBias = 0.01;
   st.scene.add(L.pendant, L.pendant.target, L.lamp, L.window, L.corner, L.corner.target);
   return L;
