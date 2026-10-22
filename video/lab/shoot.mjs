@@ -9,7 +9,7 @@ const { srv, port } = await serve(ROOT);
 const b = await chromium.launch({ args: ['--disable-gpu-vsync', '--ignore-gpu-blocklist'] });
 const W = Math.round(1920 * +scale), H = Math.round(1080 * +scale);
 const p = await b.newPage({ viewport: { width: W, height: H } });
-p.on('console', (m) => { if (['error', 'warning'].includes(m.type()) && !/GL Driver|GPU stall/.test(m.text())) console.log('[page]', m.text().slice(0, 300)); });
+p.on('console', (m) => { if (['error', 'warning'].includes(m.type()) && !/GL Driver|GPU stall/.test(m.text())) console.log('[page]', m.text().slice(0, 1200)); });
 p.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await p.goto(`http://127.0.0.1:${port}/lab/page.html?scene=${scene}&scale=${scale}&p=${encodeURIComponent(params)}`);
 await p.waitForFunction(() => window.__ready || window.__error, null, { timeout: 300000 });

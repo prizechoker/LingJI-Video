@@ -13,33 +13,69 @@ export { THREE };
 export const W = 1920;
 export const H = 1080;
 
+export function makeRenderer(scale = 1, shadows = 'pcfsoft') {
+  const r = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, stencil: false, powerPreference: 'high-performance' });
+  r.setPixelRatio(1);
+  r.setSize(Math.round(W * scale), Math.round(H * scale), false);
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  r.toneMapping = THREE.NoToneMapping; // tone mapping happens in the post chain (AgX)
+  r.toneMappingExposure = 1;
+  r.shadowMap.enabled = true;
+  r.shadowMap.type = shadows === 'vsm' ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
+  return r;
+}
+
+// equirect HDRIs and their prefiltered environments, shared by every studio on the same renderer
+const HDRI_CACHE = new Map();
+
 export class Studio {
-  constructor({ scale = 1, shadows = 'pcfsoft' } = {}) {
+  // renderer: share one WebGL context between many studios (the film's shots); else a new one is made
+  constructor({ scale = 1, shadows = 'pcfsoft', renderer = null } = {}) {
     this.scale = scale;
     this.w = Math.round(W * scale);
     this.h = Math.round(H * scale);
-    const r = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, stencil: false, powerPreference: 'high-performance' });
-    r.setPixelRatio(1);
-    r.setSize(this.w, this.h, false);
-    r.outputColorSpace = THREE.SRGBColorSpace;
-    r.toneMapping = THREE.NoToneMapping; // tone mapping happens in the post chain (AgX)
-    r.toneMappingExposure = 1;
-    r.shadowMap.enabled = true;
-    r.shadowMap.type = shadows === 'vsm' ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
+    const r = renderer || makeRenderer(scale, shadows);
     this.renderer = r;
     this.canvas = r.domElement;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(30, W / H, 0.01, 80);
     this.textures = new THREE.TextureLoader();
     this.gltf = new GLTFLoader();
+    this.pending = []; // texture loads still in flight (a film must not render a frame before they land)
+  }
+
+  // resolves when every texture asked for so far has loaded
+  async ready() {
+    while (this.pending.length) await Promise.all(this.pending.splice(0));
+  }
+
+  // free the GPU memory of this studio's scene and post chain (shared HDRIs stay cached)
+  dispose() {
+    const keep = new Set([...HDRI_CACHE.values()].flatMap((e) => [e.tex, e.env]));
+    this.scene.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+      for (const m of ms) {
+        for (const v of Object.values(m)) if (v && v.isTexture && !keep.has(v)) v.dispose();
+        m.dispose();
+      }
+      if (o.isLight && o.shadow && o.shadow.map) o.shadow.map.dispose();
+    });
+    if (this.composer) this.composer.dispose();
   }
 
   async hdri(url, { intensity = 1, rotation = 0, background = null } = {}) {
-    const tex = await new RGBELoader().loadAsync(url);
-    tex.mapping = THREE.EquirectangularReflectionMapping;
-    const pm = new THREE.PMREMGenerator(this.renderer);
-    const env = pm.fromEquirectangular(tex).texture;
-    pm.dispose();
+    const key = `${url}`;
+    let entry = HDRI_CACHE.get(key);
+    if (!entry || entry.renderer !== this.renderer) {
+      const tex = await new RGBELoader().loadAsync(url);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      const pm = new THREE.PMREMGenerator(this.renderer);
+      entry = { renderer: this.renderer, tex, env: pm.fromEquirectangular(tex).texture };
+      pm.dispose();
+      HDRI_CACHE.set(key, entry);
+    }
+    const { tex, env } = entry;
     this.scene.environment = env;
     this.scene.environmentIntensity = intensity;
     this.scene.environmentRotation.set(0, rotation, 0);
@@ -57,7 +93,9 @@ export class Studio {
   pbr(name, { repeat = [1, 1], rotation = 0 } = {}) {
     const base = `../assets/textures/${name}_`;
     const load = (k, srgb) => {
-      const t = this.textures.load(`${base}${k}.jpg`);
+      let done;
+      this.pending.push(new Promise((r) => { done = r; }));
+      const t = this.textures.load(`${base}${k}.jpg`, done, undefined, done);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       t.repeat.set(repeat[0], repeat[1]);
       t.rotation = rotation;

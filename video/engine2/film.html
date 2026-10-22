@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>film</title>
+<link rel="stylesheet" href="../node_modules/@fontsource-variable/noto-serif-sc/index.css">
+<link rel="stylesheet" href="../node_modules/@fontsource-variable/noto-sans-sc/index.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/jetbrains-mono/400.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/jetbrains-mono/500.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/jetbrains-mono/700.css">
+<style>html, body { margin: 0; background: #000; overflow: hidden; } canvas { display: block; }</style>
+<script type="importmap">
+{ "imports": {
+  "three": "../node_modules/three/build/three.module.js",
+  "three/addons/": "../node_modules/three/examples/jsm/",
+  "three/examples/jsm/": "../node_modules/three/examples/jsm/",
+  "postprocessing": "../node_modules/postprocessing/build/index.js",
+  "n8ao": "../node_modules/n8ao/dist/N8AO.js"
+} }
+</script>
+</head>
+<body>
+<canvas id="out"></canvas>
+<script type="module" src="./film_main.js"></script>
+</body>
+</html>

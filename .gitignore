@@ -3,6 +3,7 @@ video/out/
 video/cache/
 *.m4s
 video/audio/takes/
+video/audio/v1/
 video/audio/*.wav
 !video/audio/voice_ref.wav
 video/audio/*.json
@@ -21,3 +22,4 @@ video/assets/models/bot.glb
 video/assets/models/lineup.glb
 video/lab/bench.html
 video/lab/bench.mjs
+video/audio/*.log

@@ -95,9 +95,9 @@ const WRAP_DIFFUSE = `
 		reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );
 	#endif`;
 
-export function skinMaterial({ color = 0xd29a7c, roughness = 0.58, wrap = 1, backlight = 0.6, nail = 0xe4b4a4, poreScale = 70, poreStrength = 0.07 } = {}) {
+export function skinMaterial({ color = 0xc99a80, roughness = 0.52, wrap = 1, backlight = 0.6, nail = 0xe2b6a8, poreScale = 90, poreStrength = 0.12 } = {}) {
   const m = new THREE.MeshPhysicalMaterial({
-    color, roughness, ior: 1.4, specularIntensity: 0.42,
+    color, roughness, ior: 1.4, specularIntensity: 0.5,
     sheen: 0.18, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffb69a),
     clearcoat: 0.12, clearcoatRoughness: 0.4,
     normalMap: poreNormal(), normalScale: new THREE.Vector2(poreStrength, poreStrength),

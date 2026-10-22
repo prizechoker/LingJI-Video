@@ -1,5 +1,6 @@
 // Render the film (or a time range) with parallel headless-Chromium workers, streaming PNG frames into ffmpeg.
 // usage: node tools/render.mjs --scale 1 --fps 30 --workers 3 --out out/film_1080.mp4 [--from 0 --to 20] [--timeline timeline.json] [--crf 14]
+//        [--page engine2/film.html] (the realistic film; default engine/index.html, the v1 film)
 import { chromium } from '/opt/node-tools/node_modules/playwright/index.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +17,7 @@ const scale = parseFloat(args.scale || '1');
 const workers = parseInt(args.workers || '3', 10);
 const out = path.resolve(ROOT, args.out || 'out/film.mp4');
 const crf = args.crf || '14';
+const PAGE = args.page || 'engine/index.html';
 const tmpDir = path.join(path.dirname(out), `.seg_${path.basename(out, '.mp4')}`);
 if (!args.resume) fs.rmSync(tmpDir, { recursive: true, force: true });
 fs.mkdirSync(tmpDir, { recursive: true });
@@ -24,7 +26,7 @@ const { srv, port } = await serve(ROOT);
 // read duration/fps from a probe page
 const probeB = await chromium.launch();
 const probe = await probeB.newPage({ viewport: { width: 64, height: 36 } });
-await probe.goto(`http://127.0.0.1:${port}/engine/index.html?scale=0.05`);
+await probe.goto(`http://127.0.0.1:${port}/${PAGE}?scale=0.05`);
 const info = await probe.evaluate((o) => window.__init(o), { timeline: args.timeline || 'timeline.json' });
 await probeB.close();
 const fps = parseFloat(args.fps || info.fps || 30);
@@ -43,7 +45,7 @@ async function worker(k, a, b) {
   const browser = await chromium.launch({ args: ['--disable-gpu-vsync'] });
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   page.on('pageerror', (e) => console.log(`[w${k} pageerror]`, e.message));
-  await page.goto(`http://127.0.0.1:${port}/engine/index.html?scale=${scale}`);
+  await page.goto(`http://127.0.0.1:${port}/${PAGE}?scale=${scale}`);
   await page.evaluate((o) => window.__init(o), { timeline: args.timeline || 'timeline.json' });
   const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-i', '-',
     '-c:v', 'libx264', '-preset', 'slow', '-crf', crf, '-pix_fmt', 'yuv420p', '-tune', 'film', seg], { stdio: ['pipe', 'inherit', 'inherit'] });
