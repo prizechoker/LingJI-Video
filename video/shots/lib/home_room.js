@@ -346,32 +346,47 @@ export function chair(M, { cushion = true, mat = null } = {}) {
   // back legs run on up as the back posts: a square section swept along a raked curve
   const bh = 0.88, zb = -sd / 2 + lt / 2 + 0.004;
   const post = (sx) => {
+    // a square section swept along a curve in the y-z plane, its sides kept square to the x axis (no twist)
     const c = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0, zb - 0.035), new THREE.Vector3(0, 0.2, zb - 0.012), new THREE.Vector3(0, sh - 0.02, zb),
       new THREE.Vector3(0, 0.66, zb - 0.02), new THREE.Vector3(0, bh, zb - 0.07),
     ], false, 'centripetal');
-    const tube = new THREE.TubeGeometry(c, 48, 1, 4, false).toNonIndexed();
-    const ps = tube.attributes.position;
-    const cen = new THREE.Vector3();
-    for (let i = 0; i < ps.count; i++) {
-      // find the ring this vertex belongs to by its nearest curve point (rings are 5 verts in the indexed version)
-      const y = ps.getY(i);
-      let best = 0, bd = 1e9;
-      for (let k = 0; k <= 48; k++) {
-        c.getPointAt(k / 48, cen);
-        const d = Math.abs(cen.y - y) + 0.001 * Math.abs(cen.z - ps.getZ(i));
-        if (d < bd) { bd = d; best = k; }
+    const N = 40, pos = [], nrm = [], uv = [], idx = [];
+    const P = new THREE.Vector3(), Tn = new THREE.Vector3();
+    const corners = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+    for (let k = 0; k <= N; k++) {
+      const u = k / N;
+      c.getPointAt(u, P);
+      c.getTangentAt(u, Tn);
+      const n = new THREE.Vector3(0, -Tn.z, Tn.y).normalize();  // in the y-z plane, across the post
+      const r = lt * (0.5 - 0.1 * Math.abs(u - 0.45)) * (u < 0.06 ? 0.94 : 1);
+      // four faces, each with its own normal (flat sides, crisp edges)
+      for (let f = 0; f < 4; f++) {
+        const a = corners[f], b = corners[(f + 1) % 4];
+        const fn = new THREE.Vector3((a[0] + b[0]) / 2, 0, 0).add(n.clone().multiplyScalar((a[1] + b[1]) / 2)).normalize();
+        for (const q of [a, b]) {
+          pos.push(P.x + q[0] * r, P.y + n.y * q[1] * r, P.z + n.z * q[1] * r);
+          nrm.push(fn.x, fn.y, fn.z);
+          uv.push(u * 0.9, f * 0.02 + (q === b ? 0.02 : 0));
+        }
       }
-      c.getPointAt(best / 48, cen);
-      const dx = ps.getX(i) - cen.x, dz = ps.getZ(i) - cen.z, dy = ps.getY(i) - cen.y;
-      const L = Math.hypot(dx, dy, dz) || 1;
-      const u = best / 48, r = lt * (0.5 - 0.12 * Math.abs(u - 0.4));
-      ps.setXYZ(i, cen.x + (dx / L) * r * 1.414, cen.y + (dy / L) * r * 1.414, cen.z + (dz / L) * r * 1.414);
     }
-    tube.computeVertexNormals();
-    woodBoxFrom(tube);
-    const m = mesh(tube, W);
+    const per = 8;
+    for (let k = 0; k < N; k++) for (let f = 0; f < 4; f++) {
+      const a = k * per + f * 2, b = a + 1, c2 = a + per, d = b + per;
+      idx.push(a, c2, b, b, c2, d);
+    }
+    // a cap on top
+    const top = N * per;
+    idx.push(top + 0, top + 2, top + 4, top + 0, top + 4, top + 6);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    const m = mesh(geo, W);
     m.position.x = sx * (sw / 2 - lt / 2 - 0.004);
+    m.material.side = THREE.FrontSide;
     return m;
   };
   g.add(post(-1), post(1));

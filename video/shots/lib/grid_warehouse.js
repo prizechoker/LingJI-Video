@@ -55,7 +55,7 @@ export function unitGeometry() {
   const { L, W, H } = UNIT;
   return part([
     [rb(L, 0.17, W, 0.05, 0, H - 0.085, 0, 4), 0],
-    [rb(L - 0.03, 0.1, W - 0.03, 0.03, 0, 0.08, 0), 1],
+    [rb(L - 0.03, 0.125, W - 0.03, 0.03, 0, 0.0705, 0), 1], // skirt down to 8 mm off the floor (wheels hidden)
     [rb(L + 0.012, 0.04, W + 0.012, 0.02, 0, 0.14, 0), 3],
     [new THREE.CylinderGeometry(0.29, 0.3, 0.035, 48).translate(0, H + 0.016, 0), 2],
     [new THREE.CylinderGeometry(0.2, 0.2, 0.038, 48).translate(0, H + 0.018, 0), 1],

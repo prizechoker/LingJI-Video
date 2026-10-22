@@ -30,21 +30,22 @@ export async function setup({ scale, params }) {
   for (const g of ['walk', 'run']) {
     const info = gait(g), f = g === 'walk' ? walkPose : runPose;
     let worst = 0, worstY = 0;
-    const prev = {};
+    const prev = {}, total = { L: 0, R: 0 }, slips = [];
     for (let i = 0; i <= 400; i++) {
       const ph = i / 400, p = f(ph), so = soles(p);
       const hz = info.stride * ph; // the holder's advance
       for (const sd of ['L', 'R']) {
         const q = so[sd];
-        const down = q.minY + p.root.pos[1] < 0.003; // (soles() measures with the root offset included)
+        const down = q.minY < 0.002; // (soles() includes the root offset)
         const k = q.w.indexOf(Math.max(...q.w));
         const z = q.piv[k][2] + hz;
-        if (down && prev[sd] && prev[sd].k === k) worst = Math.max(worst, Math.abs(z - prev[sd].z));
+        if (down && prev[sd] && prev[sd].k === k) { worst = Math.max(worst, Math.abs(z - prev[sd].z)); total[sd] += Math.abs(z - prev[sd].z); if (Math.abs(z - prev[sd].z) > 0.001) slips.push([sd, ph.toFixed(3), k, +(z - prev[sd].z).toFixed(4)]); }
         prev[sd] = down ? { k, z } : null;
         if (down) worstY = Math.min(worstY, q.minY);
       }
     }
-    log(g, 'max slip per 1/400 cycle (m)', worst, 'deepest sole (m)', worstY, 'speed', info.speed);
+    log(g, 'max slip per 1/400 cycle (m)', worst, 'total per cycle', total, 'deepest sole (m)', worstY, 'speed', info.speed);
+    log(g, 'slips > 1 mm', slips.slice(0, 30));
   }
   for (let i = 0; i < 24; i++) {
     const ph = i / 24, p = walkPose(ph);
