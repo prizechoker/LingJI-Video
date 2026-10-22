@@ -10,7 +10,7 @@
 // cues (s from the shot's start): grid: break (default 0.68 dur)
 //                                 days: shirt (0.27 dur), cat (0.5 dur), days (0.72 dur)
 import { Studio, THREE } from '../engine2/core.js';
-import { buildHome, homeLights, TABLE, bookRow } from './lib/home_room.js';
+import { buildHome, homeLights, TABLE, bookRow, cheapEnv } from './lib/home_room.js';
 import { bowl, tumbler, mug, toyBlock, sippyCup } from './lib/home_props.js';
 import { heightField, lightGrid } from './lib/home_grid.js';
 import { simulateSweater, sweaterMesh } from './lib/home_cloth.js';
@@ -115,15 +115,6 @@ export async function create({ renderer, scale, p, dur, cues }) {
       colliders: cols, T: 2.6,
       start: { origin: rail.clone().add(new THREE.Vector3(0.8, 0.4, 0.04)).toArray(), across: across.toArray(), along: along.toArray(), normal: normal.toArray(), vel: [-2.2, 0.75, -0.08], spin: 1.0 },
     });
-    if (p.debug) {
-      for (const fi of [0, 15, 30, 45, 60, 90, 119]) {
-        const F = sim.frames[Math.min(fi, sim.frames.length - 1)];
-        let cx = 0, cy = 0, cz = 0, mn = 9, mx = -9;
-        for (let k = 0; k < sim.n; k++) { cx += F[k * 3]; cy += F[k * 3 + 1]; cz += F[k * 3 + 2]; mn = Math.min(mn, F[k * 3 + 1]); mx = Math.max(mx, F[k * 3 + 1]); }
-        console.log('sweater', fi, (cx / sim.n).toFixed(3), (cy / sim.n).toFixed(3), (cz / sim.n).toFixed(3), mn.toFixed(3), mx.toFixed(3));
-      }
-      console.log('rail', JSON.stringify(cols.slice(1, 3)));
-    }
     const knit = st.pbr('Fabric068', { repeat: [1, 1] });
     const kmat = new THREE.MeshPhysicalMaterial({ ...knit, color: 0xe2b8a0, roughness: 1, sheen: 0.8, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xffc8a0), side: THREE.DoubleSide, normalScale: new THREE.Vector2(1.2, 1.2) });
     sweater = sweaterMesh(sim, kmat);
@@ -231,6 +222,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
     st.scene.add(grid.obj);
   }
 
+  if (!p.ibl) cheapEnv(st, env, { fill: p.fill ?? 0.55 });
   const cam = CAMS[mode];
   grade(st, {
     ao: p.noao ? null : { radius: p.aor ?? 0.12, intensity: 1.6, falloff: 0.8 },

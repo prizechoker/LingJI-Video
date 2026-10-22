@@ -6,7 +6,7 @@
 // other cues are cuts. p: { exposure, env }
 // cues (s from the shot's start, defaults relative to dur): door 0.34, stairs 0.43, pan 0.51, robot 0.6
 import { Studio, THREE } from '../engine2/core.js';
-import { buildHome, homeLights, TABLE } from './lib/home_room.js';
+import { buildHome, homeLights, TABLE, cheapEnv } from './lib/home_room.js';
 import { doorSet, stairSet, stoveSet } from './lib/home_sets.js';
 import { bowl, tumbler, mug } from './lib/home_props.js';
 import { loadBot, botMaterials } from '../engine2/bot.js';
@@ -70,6 +70,11 @@ export async function create({ renderer, scale, p, dur, cues }) {
   const tRobot = cues.robot ?? Math.max(tPan + 0.5, dur * 0.6);
   const segAt = (t) => (t < tStairs ? 'door' : t < tPan ? 'stairs' : t < tRobot ? 'stove' : 'robot');
 
+  if (!p.ibl) {
+    cheapEnv(st, env, { fill: 0.55 });
+    H.M.doorWood.envMap = env;
+    H.M.doorWood.envMapIntensity = 0.16;
+  }
   grade(st, {
     ao: { radius: 0.05, intensity: 1.5, falloff: 0.7 },
     dof: { distance: 0.5, range: 0.1, bokeh: 3 },

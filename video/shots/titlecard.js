@@ -12,8 +12,8 @@ export async function create({ renderer, scale, p, cues, dur }) {
   st.scene.add(set.group);
   set.show(37, { skip: Array.from({ length: 36 }, (_, k) => k + 1) });
   const sp = restPose({ i: 14, j: 9, n: 37 }).p;
-  const rake = spot(0xffe2bf, 0, { pos: [-1.2, 0.18, 0.2], target: [0.3, 0, 0], angle: 0.5, penumbra: 1, radius: 4, shadow: 2048 });
-  const pin = spot(0xdfe9ff, 0, { pos: [sp.x + 0.1, 1.0, sp.z + 0.2], target: [sp.x, 0, sp.z], angle: 0.09, penumbra: 1, radius: 3, shadow: 1024 });
+  const rake = spot(0xffe2bf, 0, { pos: [-1.2, 0.18, 0.2], target: [0.3, 0, 0], angle: 0.5, penumbra: 1, radius: 4, shadow: 2048, normalBias: 0.0004 });
+  const pin = spot(0xdfe9ff, 0, { pos: [sp.x + 0.1, 1.0, sp.z + 0.2], target: [sp.x, 0, sp.z], angle: 0.09, penumbra: 1, radius: 3, shadow: 1024, normalBias: 0.0004 });
   st.scene.add(rake, rake.target, pin, pin.target);
   grade(st, { ao: { radius: 0.02, intensity: 1.5 }, bloom: { intensity: 0.3, threshold: 0.9 }, vignette: 0.8, contrast: 0.12, exposure: 0.9 });
   st.camera.up.set(0, 0, -1);

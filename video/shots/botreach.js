@@ -33,8 +33,8 @@ export async function create({ renderer, scale, p, cues, dur }) {
   const from = stop.clone().add(V3(0.03, 0.16, 0.22));
 
   // cold light: a narrow top light on the stone, a cool rim from behind the hand, nothing warm
-  const keyL = spot(0xcfe0ff, p.key ?? 7, { pos: [0.05, 1.3, -0.25], target: [stoneP.x, 0, stoneP.z], angle: 0.16, penumbra: 0.9, radius: 6 });
-  const rim = spot(0x8fb8ff, p.rim ?? 5, { pos: [0.35, 0.5, 0.7], target: [stoneP.x, 0.05, stoneP.z], angle: 0.25, penumbra: 1, shadow: 1024, radius: 3 });
+  const keyL = spot(0xcfe0ff, p.key ?? 7, { pos: [0.05, 1.3, -0.25], target: [stoneP.x, 0, stoneP.z], angle: 0.16, penumbra: 0.9, radius: 6, normalBias: 0.0004 });
+  const rim = spot(0x8fb8ff, p.rim ?? 5, { pos: [0.35, 0.5, 0.7], target: [stoneP.x, 0.05, stoneP.z], angle: 0.25, penumbra: 1, shadow: 1024, radius: 3, normalBias: 0.0004 });
   st.scene.add(keyL, keyL.target, rim, rim.target);
   grade(st, { ao: { radius: 0.015, intensity: 1.8 }, dof: { distance: 0.25, range: p.range ?? 0.05, bokeh: 4 }, bloom: { intensity: 0.3, threshold: 0.9 }, vignette: 0.75, contrast: 0.14, saturation: -0.15, exposure: p.exposure ?? 0.9 });
   if (st.dof) st.dof.target = stoneP.clone().add(V3(0, 0.012, 0.004));

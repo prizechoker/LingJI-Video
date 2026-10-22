@@ -48,8 +48,8 @@ export async function create({ renderer, scale, p, cues, dur }) {
   real.castShadow = real.receiveShadow = true;
   st.scene.add(real);
 
-  const keyL = spot(0xffd6a8, p.key ?? 9, { pos: [-0.2, 1.4, 0.35], target: [0, 0, 0], angle: 0.32, penumbra: 0.9, radius: 6, near: 0.5, far: 4 });
-  const flash = spot(0x9cc8ff, 0, { pos: [lidX(0) + 0.1, 0.8, -0.3], target: [lidX(0), 0, 0], angle: 0.18, penumbra: 0.8, radius: 3, near: 0.3, far: 3, shadow: 1024 });
+  const keyL = spot(0xffd6a8, p.key ?? 9, { pos: [-0.2, 1.4, 0.35], target: [0, 0, 0], angle: 0.32, penumbra: 0.9, radius: 6, near: 0.5, far: 4, normalBias: 0.0004 });
+  const flash = spot(0x9cc8ff, 0, { pos: [lidX(0) + 0.1, 0.8, -0.3], target: [lidX(0), 0, 0], angle: 0.18, penumbra: 0.8, radius: 3, near: 0.3, far: 3, shadow: 1024, normalBias: 0.0004 });
   st.scene.add(keyL, keyL.target, flash, flash.target);
 
   grade(st, { ao: { radius: 0.02, intensity: 1.8 }, dof: { distance: 0.5, range: p.range ?? 0.12, bokeh: 3.5 }, bloom: { intensity: 0.4, threshold: 0.8 }, vignette: 0.7, contrast: 0.12, exposure: p.exposure ?? 0.95 });

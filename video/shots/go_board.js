@@ -59,8 +59,8 @@ export async function create({ renderer, scale, p, cues, dur }) {
 
   // light: a warm pool from above; a cool light from AlphaGo's side that can close in on P10
   const keyI = p.key ?? 5;
-  const key1 = spot(0xffd9b0, keyI, { pos: [-0.15, 1.3, -0.05], target: [0.02, 0, 0], angle: 0.42, penumbra: 1.0, radius: 6 });
-  const cool = spot(0x8fbaff, 0, { pos: [0.3, 1.1, 0.35], target: [0.0, 0.0, 0.0], angle: 0.35, penumbra: 1, shadow: 1024, radius: 4 });
+  const key1 = spot(0xffd9b0, keyI, { pos: [-0.15, 1.3, -0.05], target: [0.02, 0, 0], angle: 0.42, penumbra: 1.0, radius: 6, normalBias: 0.0004 });
+  const cool = spot(0x8fbaff, 0, { pos: [0.3, 1.1, 0.35], target: [0.0, 0.0, 0.0], angle: 0.35, penumbra: 1, shadow: 1024, radius: 4, normalBias: 0.0004 });
   st.scene.add(key1, key1.target, cool, cool.target);
   const p10 = set.at(P10[0], P10[1], 0.0046);
 

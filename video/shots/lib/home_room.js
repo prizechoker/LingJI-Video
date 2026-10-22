@@ -1169,3 +1169,26 @@ export function homeLights(st, H, k = {}) {
   st.scene.add(L.pendant, L.pendant.target, L.lamp, L.window, L.corner, L.corner.target);
   return L;
 }
+
+// Software rendering pays for image-based light on every pixel. Keep the room's soft fill as a hemisphere light and
+// give the environment map only to what visibly reflects it (metal, glaze, glass, the robot's shell).
+export function cheapEnv(st, env, { sky = 0xffe6cc, ground = 0x3a2c22, fill = 0.55, refl = 1 } = {}) {
+  st.scene.environment = null;
+  const hemi = new THREE.HemisphereLight(sky, ground, fill);
+  st.scene.add(hemi);
+  const seen = new Set();
+  st.scene.traverse((o) => {
+    if (!o.material) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      if (seen.has(m) || !m.isMeshStandardMaterial) continue;
+      seen.add(m);
+      const shiny = m.metalness >= 0.5 || (m.clearcoat ?? 0) >= 0.5 || m.transparent || (m.transmission ?? 0) > 0;
+      if (shiny && !m.envMap) {
+        m.envMap = env;
+        m.envMapIntensity = (m.envMapIntensity ?? 1) * refl * 0.16;
+        m.needsUpdate = true;
+      }
+    }
+  });
+  return hemi;
+}

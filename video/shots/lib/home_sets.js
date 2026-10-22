@@ -2,7 +2,7 @@
 // stairs with a handrail, a wok on a gas hob with its spatula. Each set is built around its own origin; units: metres.
 import { THREE } from '../../engine2/core.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { door, bookRow, bake, framedPicture } from './home_room.js';
+import { door, framedPicture } from './home_room.js';
 import { rng } from './kit.js';
 
 const mesh = (geo, mat, cast = true) => {
@@ -88,12 +88,6 @@ export function stairSet(M, st) {
   // a runner carpet held by brass rods
   const runM = new THREE.MeshStandardMaterial({ ...st.pbr('Carpet016', { repeat: [2, 2] }), color: 0x6e2f2a, roughness: 1 });
   const runW = 0.62;
-  const prof = [];
-  for (let k = 0; k < n; k++) {
-    prof.push([0.004, k * rise + 0.002], [0.004, (k + 1) * rise + 0.006], [-go, (k + 1) * rise + 0.006]);
-  }
-  const shape = new THREE.Shape();
-  shape.moveTo(-runW / 2, 0); shape.lineTo(runW / 2, 0); shape.lineTo(runW / 2, 0.006); shape.lineTo(-runW / 2, 0.006); shape.closePath();
   const path = new THREE.CurvePath();
   let prev = new THREE.Vector3(-W / 2, 0.002, 0.03);
   for (let k = 0; k < n; k++) {
@@ -120,7 +114,6 @@ export function stairSet(M, st) {
   const runner = mesh(rg, runM, false);
   runner.material.side = THREE.DoubleSide;
   g.add(runner);
-  void shape; void prof;
   for (let k = 0; k < n; k++) {
     const rod = mesh(new THREE.CylinderGeometry(0.006, 0.006, runW + 0.06, 12), M.brass);
     rod.rotation.z = Math.PI / 2;
@@ -363,6 +356,5 @@ export function stoveSet(M, st) {
   g.userData.spatula = sp;
   g.userData.wok = new THREE.Vector3(wx, top + 0.1, wz);
   g.userData.blade = new THREE.Vector3(wx + Math.sin(yaw) * (off - 0.05), top + 0.07, wz + Math.cos(yaw) * (off - 0.05));
-  void bookRow; void bake;
   return g;
 }

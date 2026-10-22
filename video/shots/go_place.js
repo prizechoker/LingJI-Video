@@ -59,9 +59,9 @@ export async function create({ renderer, scale, p, cues }) {
   const offset = bone.matrixWorld.clone().invert().multiply(new THREE.Matrix4().compose(rest.p, holdQ, V3(1, 1, 1)));
 
   // light: warm overhead key, cool rim from AlphaGo's monitor behind the hand, faint fill
-  const key1 = spot(0xffdcb8, p.key ?? 6, { pos: [-0.2, 1.2, 0.1], target: [0.1, 0, 0.03], angle: 0.38, penumbra: 1.0, radius: 8 });
+  const key1 = spot(0xffdcb8, p.key ?? 6, { pos: [-0.2, 1.2, 0.1], target: [0.1, 0, 0.03], angle: 0.38, penumbra: 1.0, radius: 8, normalBias: 0.0004 });
   const fill = spot(0xffe6d0, p.fill ?? 0.9, { pos: [-0.5, 0.25, -0.5], target: [0.1, 0.04, 0.02], angle: 0.5, penumbra: 1.0, shadow: 0 });
-  const rim = spot(0x9cc6ff, p.rim ?? 4, { pos: [0.3, 0.95, 0.6], target: [0.1, 0.1, 0.06], angle: 0.16, penumbra: 0.8, shadow: 1024, radius: 3 });
+  const rim = spot(0x9cc6ff, p.rim ?? 4, { pos: [0.3, 0.95, 0.6], target: [0.1, 0.1, 0.06], angle: 0.16, penumbra: 0.8, shadow: 1024, radius: 3, normalBias: 0.0004 });
   st.scene.add(key1, key1.target, fill, fill.target, rim, rim.target);
   for (const [x, y, z, c, s] of [[0.9, 0.35, 1.6, 0xffc58a, 0.03], [-0.7, 0.45, 1.9, 0xffd0a0, 0.025], [0.38, 0.16, 0.62, 0x7fb5ff, 0.05]]) {
     const m = new THREE.Mesh(new THREE.SphereGeometry(s, 16, 12), new THREE.MeshBasicMaterial({ color: c }));
@@ -79,8 +79,11 @@ export async function create({ renderer, scale, p, cues }) {
 
   const tc = cues.contact ?? p.contact ?? 1.6;
   const slow = p.slow ?? 1;
-  const APPROACH = 0.85, RETRACT = 0.8; // real seconds
-  const hover = V3(0.012, 0.075, 0.11).applyAxisAngle(V3(0, 1, 0), flip); // where the approach starts (up, toward the player)
+  const REACH = 1.25, RETRACT = 0.8; // real seconds
+  // the reach: from up by the player's bowl (far), curving through above the point (hover, the Bezier control) down
+  // onto it, fast at first and slowing into the placement; out of the light before it starts, so no shadow waits there
+  const far = V3(0.05, 0.24, 0.34).applyAxisAngle(V3(0, 1, 0), flip);
+  const hover = V3(0.012, 0.075, 0.11).applyAxisAngle(V3(0, 1, 0), flip);
   const away = V3(-0.01, 0.06, 0.12).applyAxisAngle(V3(0, 1, 0), flip);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pp = V3(), sc = V3();
   const qa = new THREE.Quaternion(), pa = V3();
@@ -90,11 +93,13 @@ export async function create({ renderer, scale, p, cues }) {
     update(t, env) {
       const u = (t - tc) / slow; // real seconds from the moment of contact
       // the hand's path: an arc that decelerates into the point, then a lift away
+      h.holder.visible = u > -REACH;
       if (u < 0) {
-        const s = clamp((u + APPROACH) / APPROACH);
-        const e = 1 - (1 - s) ** 2.4;
-        h.holder.position.copy(contactPos).addScaledVector(hover, 1 - e).add(V3(0, 0.012 * Math.sin(Math.PI * e) * (1 - e), 0));
-        h.holder.rotation.set(pitch0 - 0.12 * (1 - e), yaw0 + 0.05 * (1 - e), 0, 'YXZ');
+        const s = clamp((u + REACH) / REACH);
+        const e = 1 - (1 - s) ** 2.2, f = 1 - e;
+        h.holder.position.copy(contactPos).addScaledVector(far, f * f).addScaledVector(hover, 2 * e * f)
+          .add(V3(0, 0.012 * Math.sin(Math.PI * e) * f, 0));
+        h.holder.rotation.set(pitch0 - 0.16 * f - 0.1 * f * f, yaw0 + 0.06 * f, 0, 'YXZ');
       } else {
         const r = ss(clamp(u / RETRACT));
         h.holder.position.copy(contactPos).addScaledVector(away, r);
