@@ -4,8 +4,8 @@
 // the die halves, the shot end), with a glowing casting, a quench tank and a dim, hazy factory around it.
 // World: machine axis along x, die parting plane at x = 0, die centre at y = DIE.y, operator side toward +z.
 import { THREE } from '../../engine2/core.js';
-import { Parts, mat4, rod, bentPath, boxUV, scaleUV, RoundedBoxGeometry, canvas, canvasTex, noise2, fbm, puffTexture, V } from './archive_util.js';
-import { rng, clamp, lerp, ss } from './kit.js';
+import { Parts, mat4, rod, RoundedBoxGeometry, canvas, canvasTex, noise2, fbm, puffTexture, V } from './archive_util.js';
+import { rng, clamp, lerp } from './kit.js';
 
 export const DIE = { y: 1.25, open: 0.75, eject: 0.08 };
 // the Unimate stands on the operator side; at swing 0 its arm points along -z, into the open die

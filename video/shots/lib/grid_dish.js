@@ -141,8 +141,10 @@ export function buildDishwasher(st) {
   add(bx(DW.w - 0.004, 0.055, 0.004, 0, dh - 0.03, 0.0235), black, door); // control strip glass
   add(rb(0.38, 0.018, 0.028, 0.008, 0, dh - 0.085, 0.034), steel, door); // handle bar
   for (const x of [-0.17, 0.17]) add(rb(0.02, 0.022, 0.026, 0.004, x, dh - 0.085, 0.022), steel, door);
-  add(rb(0.16, 0.1, 0.02, 0.008, 0.05, dh * 0.62, -0.035), grey, door); // detergent dispenser
-  add(rb(0.12, 0.07, 0.006, 0.006, 0.05, dh * 0.62, -0.046), dark, door);
+  // detergent dispenser: a moulded grey housing with a hinged lid and a small latch
+  add(rb(0.17, 0.11, 0.016, 0.01, 0.05, dh * 0.62, -0.034), grey, door);
+  add(rb(0.13, 0.075, 0.008, 0.008, 0.045, dh * 0.62, -0.043), grey, door);
+  add(rb(0.03, 0.012, 0.006, 0.003, 0.045, dh * 0.62 + 0.03, -0.048), dark, door);
   const leds = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x8fd6ff).multiplyScalar(2.2), toneMapped: false });
   for (let k = 0; k < 4; k++) add(bx(0.012, 0.004, 0.002, 0.12 + k * 0.03, dh - 0.03, 0.0262), leds, door);
 

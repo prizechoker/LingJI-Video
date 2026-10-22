@@ -141,7 +141,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
   const tCat = cues.cat ?? dur * 0.5;
   if (mode === 'days') {
     // from the floor by the table's left end, up onto the table; seen by the corner lamp
-    cat = catGobo(L.corner, { size: 1024, start: new THREE.Vector3(-1.2, 0, 0.28), fwd: new THREE.Vector3(1, 0, -0.12).normalize(), blur: 3 });
+    cat = catGobo(L.corner, { size: 1024, start: new THREE.Vector3(-1.3, 0, 0.3), fwd: new THREE.Vector3(1, 0, -0.12).normalize(), blur: 3 });
   }
 
   let arranged = -1;

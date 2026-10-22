@@ -128,13 +128,13 @@ export async function create({ renderer, scale, p, dur, cues }) {
         const order = [5, 4, 3, 2, -1, -1][k];
         const rest = b.userData.rest;
         if (order < 0) { b.position.copy(rest); b.visible = true; return; }
-        const tk = tSlot - 0.35 + order * 0.14;
-        const u = clamp((t - tk) / 0.42);
-        b.visible = t > tk - 0.02;
-        // a quick descent that eases into the tines, a millimetre of settle
-        const e = easeOut(u, 3);
-        b.position.set(rest.x, rest.y + 0.22 * (1 - e) + 0.002 * Math.sin(u * Math.PI * 3) * (1 - u), rest.z + 0.03 * (1 - e));
-        b.rotation.set(Math.PI - 0.95 - 0.25 * (1 - e), 0, 0);
+        // time-lapse loading: each bowl appears in its slot and settles the last couple of centimetres
+        const tk = tSlot - 0.2 + order * 0.17;
+        const u = clamp((t - tk) / 0.14);
+        b.visible = t >= tk;
+        const e = easeOut(u, 2.5);
+        b.position.set(rest.x, rest.y + 0.022 * (1 - e), rest.z + 0.004 * (1 - e));
+        b.rotation.set(Math.PI - 0.95 - 0.06 * (1 - e), 0, 0);
       });
       // ---- rack and door
       const rackOut = 1 - ss(clamp((t - tIn0) / (tIn1 - tIn0)));
@@ -152,7 +152,7 @@ export async function create({ renderer, scale, p, dur, cues }) {
       st.scene.environmentIntensity = (p.env ?? 0.5) * (1 - 0.8 * sec);
       st.scene.backgroundIntensity = 0.2 * (1 - 0.9 * sec);
       inner.intensity = (p.inner ?? 3) * sec;
-      back.intensity = (p.back ?? 1.2) * sec;
+      back.intensity = (p.back ?? 0) * sec;
       // ---- spray arms + water
       const om = 2 * Math.PI * 1.15;
       dw.armL.rotation.y = om * slow * t;

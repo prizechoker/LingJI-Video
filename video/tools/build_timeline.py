@@ -116,15 +116,15 @@ def storyboard():
     S.append(shot("dish", A("B18", "可它", -0.1), A("B18", "$", 0.5), p=dict(seed=19), cues=dict(slip=A("B18", "可它", 0.2), impact=A("B18", "碗", 0.0))))
     S.append(shot("titlecard", A("B19", "$", 0.3), A("B19", "$", 3.25), cues=dict(title=A("B19", "$", 0.75)), fadeIn=0.5, fadeOut=0.0))
     # 3 五个小时
-    S.append(shot("cart", A("C20", "^", -0.4), A("C21", "^", -0.1), p=dict(mode="room"), fadeIn=0.6))
+    S.append(shot("cart", A("C20", "^", -0.4), A("C21", "^", -0.1), p=dict(mode="room"), cues=dict(title=A("C20", "^", 0.1)), fadeIn=0.6))
     S.append(shot("cart", A("C21", "^", -0.1), A("C21", "$", 0.5), p=dict(mode="crawl"),
-                  cues=dict(five=A("C21", "五个小时", -0.2), stop=A("C21", "每走一米", 0.0), photo=A("C21", "停下来拍照", 0.1), think=A("C21", "再想", 0.0))))
+                  cues=dict(five=A("C21", "五个小时", -0.6), stop=A("C21", "每走一米", 0.0), photo=A("C21", "拍照", 0.0), think=A("C21", "再想", 0.0))))
     S.append(shot("balance", A("C21", "$", 0.5), A("C22", "$", 0.5), cues=dict(name=A("C22", "莫拉维克", -0.2), easy=A("C22", "让电脑下棋", 0.0), hard=A("C22", "难的是", 0.0),
                   look=A("C22", "看一眼", 0.0), walk=A("C22", "走两步", 0.0), grab=A("C22", "伸手拿", 0.0)), fadeIn=0.3))
     S.append(shot("go_place", A("C22", "$", 0.5), A("C23", "$", 0.9), p=dict(cam="hero", slow=2.4, key=7), cues=dict(contact=A("C23", "一只人的手", 0.4)), fadeIn=0.4))
     # 4 把世界摆成棋盘
     S.append(shot("factory_grid", A("D24", "^", -0.4), A("D24", "$", 0.4), p=dict(mode="match"), cues=dict(factory=A("D24", "工厂里的", -0.1)), fadeIn=0.5))
-    S.append(shot("unimate", A("D24", "$", 0.4), A("D25", "$", 0.4), p=dict(mode="work"), cues=dict(hot=A("D25", "滚烫的", 0.0)), fadeIn=0.3))
+    S.append(shot("unimate", A("D24", "$", 0.4), A("D25", "$", 0.4), p=dict(mode="work"), cues=dict(title=A("D25", "^", 0.1), open=A("D25", "从压铸机里", -0.5), grip=A("D25", "夹出", 0.0), hot=A("D25", "滚烫的", 0.0)), fadeIn=0.3))
     S.append(shot("unimate", A("D25", "$", 0.4), A("D26", "$", 0.4), p=dict(mode="blind"), cues=dict(dark=A("D26", "看不见", -0.3))))
     S.append(shot("unimate", A("D26", "$", 0.4), A("D27", "$", 0.4), p=dict(mode="repeat"), cues=dict(each=A("D27", "每个零件", 0.0), same=A("D27", "同一个位置", 0.0))))
     S.append(shot("factory_grid", A("D27", "$", 0.4), A("D28", "$", 0.6), p=dict(mode="board"), cues=dict(board=A("D28", "一张棋盘", -0.1)), fadeIn=0.3))

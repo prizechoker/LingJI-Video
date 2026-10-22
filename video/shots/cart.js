@@ -13,7 +13,7 @@
 //    override), archive (0.8), dof (bool, room default true), readout ('left' | 'right', crawl, default left);
 //    cam ({ pos, look, fov } override, for tests)
 import { Studio, THREE } from '../engine2/core.js';
-import { ss, sstep, clamp, lerp, easeOut, breathe, grade, caption, text, FONT, measure, rng, archive, weave, V3 } from './lib/kit.js';
+import { ss, sstep, clamp, lerp, easeOut, breathe, grade, caption, text, FONT, measure, archive, weave, V3 } from './lib/kit.js';
 import { buildCart, CART, chairMaterials, buildChair } from './lib/archive_cart.js';
 import { buildLab } from './lib/archive_lab.js';
 import { captureEnv } from './lib/archive_util.js';

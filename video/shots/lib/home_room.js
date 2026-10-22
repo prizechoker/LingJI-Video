@@ -153,7 +153,7 @@ export function homeMaterials(st, env) {
   const br = st.pbr('Metal048C', { repeat: [0.6, 0.6] });
   M.brass = new THREE.MeshStandardMaterial({ ...br, color: 0xd9bf8c, metalness: 1, roughness: 0.55, normalScale: new THREE.Vector2(0.25, 0.25), envMap: env, envMapIntensity: 1.3 });
   const dw = P('Wood026', { repeat: [1.2, 1.2] }, 4);
-  M.doorWood = new THREE.MeshPhysicalMaterial({ ...dw, color: 0xc89470, roughness: 0.48, clearcoat: 0.35, clearcoatRoughness: 0.3, normalScale: new THREE.Vector2(0.4, 0.4) });
+  M.doorWood = new THREE.MeshPhysicalMaterial({ ...dw, color: 0xb89a80, roughness: 0.48, clearcoat: 0.35, clearcoatRoughness: 0.3, normalScale: new THREE.Vector2(0.4, 0.4) });
   M.black = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.6, roughness: 0.45 });
   M.glass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.1, envMap: env, envMapIntensity: 1.5, depthWrite: false });
   return M;

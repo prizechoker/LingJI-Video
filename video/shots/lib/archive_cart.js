@@ -327,7 +327,6 @@ export function buildCart(st, mats = cartMaterials(st)) {
     return m;
   };
 
-  const tmpV = V();
   return {
     group: root,
     body,
@@ -361,7 +360,6 @@ export function buildCart(st, mats = cartMaterials(st)) {
         body.add(cable);
         cableAt = key;
       }
-      tmpV.set(0, 0, 0);
     },
   };
 }

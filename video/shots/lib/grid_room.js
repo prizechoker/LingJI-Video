@@ -54,8 +54,8 @@ export async function buildRoom(st, { seed = 3 } = {}) {
   const throwMat = new THREE.MeshPhysicalMaterial({ ...chairFab, color: 0xc9a77c, roughness: 0.95, sheen: 0.6, sheenColor: new THREE.Color(0xf0dcc0) });
   const oak = st.pbr('Wood022', { repeat: [1, 1] });
   const oakMat = new THREE.MeshPhysicalMaterial({ ...oak, color: 0xe8dccb, roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.3 });
-  const walnut = st.pbr('Wood026', { repeat: [1, 1] });
-  const walnutMat = new THREE.MeshPhysicalMaterial({ ...walnut, color: 0xb5a89c, roughness: 0.45, clearcoat: 0.35, clearcoatRoughness: 0.25 });
+  const walnut = st.pbr('Wood022', { repeat: [1, 1] });
+  const walnutMat = new THREE.MeshPhysicalMaterial({ ...walnut, color: 0x8a7462, roughness: 0.45, clearcoat: 0.35, clearcoatRoughness: 0.25 });
   const blackMetal = new THREE.MeshStandardMaterial({ color: 0x1c1d1f, roughness: 0.45, metalness: 0.7 });
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xe9e4dc, roughness: 0.9 });
   const capMat = new THREE.MeshStandardMaterial({ color: 0x2b2a28, roughness: 0.9 });

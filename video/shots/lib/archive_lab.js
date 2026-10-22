@@ -3,7 +3,7 @@
 // ceiling with fluorescent troffers, a chalkboard, a door and a wall clock on the far (-z) wall, a steel desk with a
 // terminal and cabinets along the -x wall, cardboard obstacles. Floor at y = 0.
 import { THREE } from '../../engine2/core.js';
-import { Parts, mat4, rod, boxUV, canvas, canvasTex, noise2, fbm, normalFromHeight, greyCanvas, RoundedBoxGeometry, V } from './archive_util.js';
+import { Parts, mat4, rod, canvas, canvasTex, noise2, fbm, normalFromHeight, greyCanvas, V } from './archive_util.js';
 import { rng } from './kit.js';
 
 export const LAB = { x0: -5, x1: 5, z0: -9, z1: 5, h: 3.0, sill: 0.95, head: 2.35 };

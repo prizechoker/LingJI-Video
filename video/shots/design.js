@@ -138,16 +138,16 @@ export async function create({ renderer, scale, p, dur, cues }) {
         shoot(pos, blade.clone().add(V3(0.01, 0.0, -0.02)), 32, 0.12, 3, blade);
       } else {
         room(true);
-        // the corner lamp's light, lifted a little so the chairs' shadows fall short of the doorway
-        setKey(V3(-1.6, 1.75, 1.9), V3(1.7, 0.95, -1.74), corner0.I * 1.1, 0.5);
+        // the pendant's warm spill from high in the room (steep, so the chairs' shadows fall short of the doorway)
+        setKey(V3(0.55, 2.5, 0.1), V3(1.75, 0.95, -1.74), 22, 0.42);
         fill.intensity = 0;
         // a cool light from the hall behind: the machine's outline in the warm room
         rim.position.set(2.15, 2.35, -3.9);
         rim.target.position.set(1.72, 1.1, -1.74);
         rim.intensity = 26;
         const u = ss(clamp((t - tRobot) / Math.max(1.5, dur - tRobot)));
-        const pos = V3(lerp(1.08, 1.32, u), lerp(1.12, 1.2, u), lerp(2.1, 0.75, u)).add(V3(...breathe(t, 0.004, 9)));
-        shoot(pos, V3(lerp(1.62, 1.7, u), lerp(0.92, 1.05, u), -1.74), 38, 1.4, 1.8, V3(1.75, 1.0, -1.74));
+        const pos = V3(lerp(1.08, 1.3, u), lerp(1.12, 1.16, u), lerp(2.1, 0.95, u)).add(V3(...breathe(t, 0.004, 9)));
+        shoot(pos, V3(lerp(1.62, 1.7, u), lerp(0.92, 0.97, u), -1.74), 38, 1.4, 1.8, V3(1.75, 1.0, -1.74));
       }
     },
     overlay(g, t) {
