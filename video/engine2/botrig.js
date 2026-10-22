@@ -511,7 +511,7 @@ function runAngles(phase) {
   });
   const arm = (p) => { // forward when the other side's leg is forward
     const fwd = 0.5 + 0.5 * C(p - 0.05);
-    return { shoulder: [-0.66 + 1.12 * fwd, 0.22 + 0.08 * fwd, 0.15 - 0.05 * fwd], elbow: 1.42 + 0.14 * fwd, wrist: [0.12, 0.25, 0.05], fingers: 0.62, thumb: 0.55, spread: -0.2 };
+    return { shoulder: [-0.66 + 1.12 * fwd, 0.16 + 0.14 * fwd, 0.3 - 0.2 * fwd], elbow: 1.42 + 0.14 * fwd, wrist: [0.12, 0.25, 0.05], fingers: 0.62, thumb: 0.55, spread: -0.2 };
   };
   return {
     root: { pos: [0, 0, 0], rot: [0.08, -0.11 * C(phase), -0.06 * S(phase)] },
