@@ -534,17 +534,32 @@ print("heat: verts without weight", int(((s_ < 1e-6) & ~STRAY).sum()), " sum ran
 
 # ================================================================ reshaping the weights
 class Graph:
-    """umbrella smoothing of per-vertex values over the welded body's edges"""
+    """smoothing of per-vertex values over the welded body, with cotangent weights (so the result is smooth in space,
+    whatever the mesh's connectivity; the obtuse pairs' weights are kept small and positive)"""
 
-    def __init__(self, E, n):
-        self.E = E
-        self.deg = np.maximum(np.bincount(E.ravel(), minlength=n).astype(float), 1)
+    def __init__(self, U, F):
+        n = len(U)
+        Es, Ws = [], []
+        for i0, i1, i2 in ((0, 1, 2), (1, 2, 0), (2, 0, 1)):
+            a_, b_, c_ = F[:, i0], F[:, i1], F[:, i2]  # (the angle at c_, opposite the edge a_-b_)
+            u_, v_ = U[a_] - U[c_], U[b_] - U[c_]
+            Es.append(np.stack([a_, b_], 1))
+            Ws.append(0.5 * (u_ * v_).sum(1) / np.maximum(np.linalg.norm(np.cross(u_, v_), axis=1), 1e-12))
+        E = np.sort(np.concatenate(Es), 1)
+        key = E[:, 0] * n + E[:, 1]
+        uk, inv = np.unique(key, return_inverse=True)
+        w = np.bincount(inv, np.concatenate(Ws))
+        self.E = np.stack([uk // n, uk % n], 1)
+        self.w = np.clip(w, 0.02 * np.median(np.abs(w)), None)
+        self.n = n
+        self.deg = np.maximum(np.bincount(self.E.ravel(), np.concatenate([self.w, self.w]), n), 1e-12)
 
     def lap(self, X):
-        acc = np.zeros_like(X)
-        np.add.at(acc, self.E[:, 0], X[self.E[:, 1]])
-        np.add.at(acc, self.E[:, 1], X[self.E[:, 0]])
-        return acc / (self.deg[:, None] if X.ndim == 2 else self.deg) - X
+        if X.ndim == 2:
+            return np.stack([self.lap(X[:, k]) for k in range(X.shape[1])], 1)
+        e0, e1 = self.E[:, 0], self.E[:, 1]
+        acc = np.bincount(e0, self.w * X[e1], self.n) + np.bincount(e1, self.w * X[e0], self.n)
+        return acc / self.deg - X
 
     def smooth(self, X, iters, w=1.0, lam=0.5):
         w = np.asarray(w, float)
@@ -555,7 +570,7 @@ class Graph:
         return X
 
 
-G = Graph(EW, len(U))
+G = Graph(U, FW)
 WH = WH / np.maximum(WH.sum(1, keepdims=True), 1e-9)
 hw = {nm: WH[:, i] for i, nm in enumerate(HEAT)}
 # the parts' shares: torso, each clavicle, arm and leg (heat weights decide where one part gives way to the next)
@@ -569,6 +584,58 @@ for sd in SIDES:
 # smooth the junctions (shoulders, armpits, hips, groin), not the limbs' far ends
 junction = ((z > 1.15) & (np.abs(x) < 0.26)) | ((z > 0.70) & (z < 1.08))
 S = G.smooth(S, 40, junction & ~STRAY)
+S = np.clip(S, 0, None)
+S /= np.maximum(S.sum(1, keepdims=True), 1e-9)
+# The arm's share at the shoulder is a smooth (harmonic, cotangent-weighted) field, pinned where the answer is clear:
+# above the armpit to the armhole seam (COLOR_0.a, the signed distance to it, + on the arm's side: none on the black
+# yoke, all of it 4.5 cm out on the shoulder cap; so the yoke stays with the chest and the cap turns, tucking under
+# the yoke's edge, with the arm); 0 on the chest's and back's middle and on the trunk's side below z 1.12; 1 on the
+# arm from 12 cm below the shoulder joint. Between, the pec, the lat and the armpit stretch smoothly after the arm.
+def harmonic(val, fixed, region, iters=4000):
+    """Laplace interpolation (cotangent weights) over region: val kept where fixed, the rest relaxed"""
+    sel = region[G.E[:, 0]] | region[G.E[:, 1]]
+    e0, e1, w = G.E[sel, 0], G.E[sel, 1], G.w[sel]
+    n = len(val)
+    deg = np.maximum(np.bincount(e0, w, n) + np.bincount(e1, w, n), 1e-12)
+    free = region & ~fixed
+    a_ = val.copy()
+    for _ in range(iters):
+        acc = np.bincount(e0, w * a_[e1], n) + np.bincount(e1, w * a_[e0], n)
+        a_ = np.where(free, acc / deg, a_)
+    return a_
+
+
+SHOULDER = os.environ.get("RIG_SHOULDER", "yoke")
+COL = accessor(J0, B0, BODY_PR["attributes"]["COLOR_0"]).astype(float) / 65535
+DCH = np.zeros((len(U), 4))
+DCH[WELD] = (COL - 0.5) * 0.1
+d_seam = DCH[:, 3]
+for sd, s in (SIDES.items() if SHOULDER != "heat" else []):
+    ca, cc = PARTS.index("arm_" + sd), PARTS.index("clav_" + sd)
+    side = (s * x > 0.0) & ~STRAY
+    drawn = side & (np.abs(d_seam) < 0.045)  # (where the seam is drawn: above its lower end)
+    z_s = np.percentile(z[drawn], 1)
+    gh, el = JNT["upperarm_" + sd], JNT["forearm_" + sd]
+    tau = (U - gh) @ unit(el - gh)
+    armish = S[:, ca] > 0.5
+    region = side & (z > 1.0) & (np.linalg.norm(U - gh, axis=1) < 0.3)
+    val = S[:, ca].copy()
+    top = region & (z > z_s + 0.012)
+    if SHOULDER == "seam":
+        val[top] = sstep(d_seam[top], -0.005, 0.045)
+    else:  # the heat weights' share, faded out inside the yoke
+        val[top] = val[top] * sstep(d_seam[top], -0.04, 0.0)
+    on_arm = region & ~top & armish & (tau > 0.12)
+    on_trunk = region & ~top & ~armish & ((s * x < 0.09) | (z < 1.12))
+    val[on_arm], val[on_trunk] = 1.0, 0.0
+    fixed = top | on_arm | on_trunk | (region & (np.linalg.norm(U - gh, axis=1) > 0.27))
+    a_new = np.where(region, np.clip(harmonic(val, fixed, region), 0, 1), S[:, ca])
+    rest_ = S.sum(1) - S[:, ca]
+    k = np.where(rest_ > 1e-6, (1 - a_new) / np.maximum(rest_, 1e-9), 0.0)
+    S[:, [c for c in range(S.shape[1]) if c != ca]] *= k[:, None]
+    S[:, cc] += np.where(rest_ > 1e-6, 0.0, 1 - a_new)  # (where only the arm had a share: to the clavicle)
+    S[:, ca] = a_new
+    print(f"  armhole seam {sd}: drawn above z {z_s:.3f}; harmonic: {(region & ~fixed).sum()} free verts")
 S = np.clip(S, 0, None)
 S /= np.maximum(S.sum(1, keepdims=True), 1e-9)
 
@@ -812,6 +879,8 @@ def top4(W, scale):
 
 
 bj, bw = top4(Wb[WELD], 65535)  # back to the exported (unwelded) vertex order
+fifth = np.sort(Wb, 1)[:, -5]
+print(f"weights: verts with a 5th influence > 1 %: {(fifth > 0.01).sum()}, > 3 %: {(fifth > 0.03).sum()}")
 lost = 1 - np.sort(Wb, 1)[:, -4:].sum(1)
 print(f"weights: max share beyond the top 4 {lost.max():.3f} (verts > 2 %: {(lost > 0.02).sum()})")
 

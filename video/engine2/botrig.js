@@ -163,6 +163,7 @@ function swingTwist(q, axis, swing, twist) {
 }
 
 const softplus = (v, k) => k * Math.log1p(Math.exp(v / k));
+const smooth01 = (u) => { const t = Math.max(0, Math.min(1, u)); return t * t * (3 - 2 * t); };
 
 // The shoulder girdle's share of an arm movement (the scapulohumeral rhythm): the clavicle lifts as the arm rises past
 // ~30 degrees and draws forward as the arm reaches forward. dir: the arm's direction (shoulder to elbow) in the chest's
@@ -171,6 +172,7 @@ export function shoulderRhythm(dir) {
   const elev = Math.acos(Math.max(-1, Math.min(1, -dir.y)));
   return {
     elevate: Math.min(0.24 * softplus(elev - 0.6, 0.12), 0.3),
+    lift: 0.055 * smooth01((elev - 1.3) / 1.4), // metres
     protract: 0.16 * Math.max(0, dir.z) * Math.min(1, elev / 0.8) - 0.06 * Math.max(0, -dir.z),
   };
 }
@@ -192,6 +194,15 @@ function poseArm(B, sd, s, a) {
   const tw = swingTwist(qua, Y, _sw, _tw);
   setBone(B['x_shoulder_' + sd], _q2.copy(_I).slerp(_sw, 1 / 3));
   setBone(B['x_shoulder2_' + sd], _q2.copy(_I).slerp(_sw, 2 / 3));
+  // overhead, the arm's root rides up and out (the shoulder blade's upward turn), so the shoulder cap rolls up over the
+  // yoke instead of into it; the in-between bones take a third and two thirds of the lift
+  const lift = (r.lift ?? 0) * (a.lift ?? 1);
+  if (lift > 0) {
+    _v.set(s * 0.3, 1, 0).multiplyScalar(lift);
+    ua.position.addScaledVector(_v, 1);
+    B['x_shoulder_' + sd].position.addScaledVector(_v, 1 / 3);
+    B['x_shoulder2_' + sd].position.addScaledVector(_v, 2 / 3);
+  }
   setBone(B['x_uatwist_' + sd], _q2.setFromAxisAngle(Y, -tw));
   setBone(B['x_uatwist2_' + sd], _q2.setFromAxisAngle(Y, -tw / 2));
   const el = a.elbow || 0;
