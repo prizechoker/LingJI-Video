@@ -11,7 +11,8 @@
 //                   `parts` — the first flange lands (default dur * 0.36); `board` (一张棋盘) — the board is complete:
 //                   border and star points in, the last flanges down (default dur * 0.8).
 //         'cold'  — (F43) a cold, wide, slow high-angle slide down the main aisle, robots welding in their cells.
-// p.h0: (match) start height above the board, m (default 0.3: the lines fill the frame)
+// p.h0: (match) start height above the board, m (default 0.3: the lines fill the frame; keep <= 0.4 so the board's
+//       edge stays out of frame through the dissolve). cue `dissolve`: end of the board->floor dissolve (default 1.15 s).
 // p.exposure, p.env, p.key, p.pools, p.fog, p.arc (arc light strength), p.haze (0 = off)
 import { Studio, THREE, spot } from '../engine2/core.js';
 import { BOARD } from '../engine2/goban.js';
@@ -55,9 +56,10 @@ export async function create({ renderer, scale, p, dur, cues }) {
   // the board patch (D28): the main aisle plus the two blocks right of it at j = -1, 0 are left open
   const BOARD_C = new THREE.Vector2(3 * G[0], -4 * G[1]);
   const GO_CELL = [G[0] / 2, G[1] / 2];
-  const openBlock = (r, j) => mode === 'board' && r === 4 && (j === -1 || j === 0);
+  const openBlock = (r, j, row) => mode === 'board' && row[0] === 2 && (j === -1 || j === 0);
   const fac = await buildFactory(st, {
-    block: (r, j) => (openBlock(r, j) ? null : ((j + r * 2) % 4 === 3 ? 'handle' : 'weld')),
+    // (around the board every cell welds: the board sits in a ring of arcs)
+    block: (r, j, row) => (openBlock(r, j, row) ? null : mode !== 'board' && (((j + r * 2) % 4) + 4) % 4 === 3 ? 'handle' : 'weld'),
     hazeI: p.haze ?? (mode === 'board' ? 0 : 0.01),
     fixtures: mode === 'match',
     jRange: p.jRange || [-7, 2],

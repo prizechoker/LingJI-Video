@@ -133,7 +133,7 @@ function handleProgram(A0, B0, period, phase) {
 }
 
 // ------------------------------------------------------------------------------------------------ the set
-// opts: blocks: (row, j) -> 'weld' | 'handle' | null ; zRange: [jMin, jMax] ; floor overrides
+// opts: block: (rowIndex, j, [x0, x1] cells) -> 'weld' | 'handle' | null ; jRange: [jMin, jMax] ; floor overrides
 export async function buildFactory(st, {
   jRange = [-9, 2], rows = ROWS, block = (r, j) => ((j + r * 2) % 4 === 3 ? 'handle' : 'weld'),
   floor: floorOpts = {}, fixtures = true, sparksMax = 2600, maxSparkArms = 14, armPaint = 0xd3d8de, hazeI = 0.035, lodDist = 22, glowPower = 3.5,
@@ -154,7 +154,7 @@ export async function buildFactory(st, {
   const cells = [];
   for (let r = 0; r < rows.length; r++) {
     for (let j = jRange[0]; j <= jRange[1]; j++) {
-      const type = block(r, j);
+      const type = block(r, j, rows[r]);
       if (!type) continue;
       const [a, b] = rows[r];
       const cx = ((a + b) / 2) * G[0], cz = 7 * j * G[1];

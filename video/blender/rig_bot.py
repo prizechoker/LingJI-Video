@@ -1,22 +1,29 @@
 """Rig the home robot (assets/models/bot.glb, built by blender/build_bot.py) for posing and animation.
 
 Output: assets/models/bot_rig.glb — the same three meshes, untouched (every original accessor, COLOR_0 included, is
-copied byte for byte), plus one skeleton:
+copied byte for byte into the new file), plus one skeleton of 69 joints:
   B_body   skinned (4 influences per vertex, 16-bit weights)
-  B_shoes  skinned to foot_L/R and toe_L/R (the shoe flexes across the ball of the foot)
+  B_shoes  skinned to foot_L/R and toe_L/R (each shoe flexes across the ball of the foot)
   B_head   rigid: a child of the head joint
-The joints are placed from the geometry (cross-section centroids along each limb, the narrowest section at the wrist,
-the shoulder cap, the shoes' soles, the fingers' centre lines). The body's weights start from Blender's heat
-weighting (bone heat) and are then reshaped: each limb's share is redistributed along the limb with smooth bands
-centred on the joints, the spine's share likewise along the spine, the fingers get their own weights from their
-centre lines, and junctions are smoothed. Helper bones (twist and mid-joint bones, names starting with "x_") carry
-weights too; engine2/botrig.js drives them from the main joints.
+Joints are placed from the geometry: cross-section centroids along each limb (upper-arm and forearm centre lines meet
+at the elbow; the wrist at the forearm's narrowest section; the knee just above the leg's narrowest section; the hip
+from the thigh's centre line and the crotch), the shoulder at the centre of the shoulder cap, the ankles and the balls
+of the feet from the shoes' soles, the fingers and thumb from their centre lines (geodesic rings from the tips).
+Weights: Blender's bone heat (the trunk given extra segments that fill its volume, so no limb claims the chest or the
+belly) decides the parts' shares — trunk, clavicles, arms, legs — which are smoothed (cotangent Laplacian); at the
+shoulder the arm's share is re-solved as a harmonic field (smooth for raised arms; none on the glossy yoke). Within
+each part the share is laid out along the limb with smooth bands at the joints, the spine's along the height, the
+fingers' from their centre lines; the leg's cut end inside the shoe follows the foot. Helper bones ("x_..." — in-
+between bones at shoulder, elbow, hip and knee, twist bones along the upper arm and forearm) carry part of the
+weights; engine2/botrig.js drives them from the main joints.
 
 Joint frames (glTF / three.js space: x = the robot's left, y = up, z = forward): the trunk, neck, head and clavicles
 are axis-aligned; each limb bone's local y runs up the limb (toward its parent) and its local x is the hinge axis,
-oriented so that a positive rotation about x flexes the joint (see engine2/botrig.js for the pose conventions).
+oriented so that a positive rotation about x flexes the joint (see engine2/botrig.js for the pose conventions). The
+file's extras hold the joints' positions, the leg chain's rest transforms and sole points (engine2/botrig.js keeps a
+copy, LEGREST/SOLE, printed at the end of a run) and points on the hands (palm, grip, fingertips).
 
-run: /opt/venvs/blender/bin/python blender/rig_bot.py [in.glb] [out.glb]
+run: /opt/venvs/blender/bin/python blender/rig_bot.py [in.glb] [out.glb]   (about 30 s; reads assets/models/bot.glb)
 """
 import heapq
 import json
@@ -32,7 +39,6 @@ args = [a for a in sys.argv[1:] if not a.startswith("-")]
 SRC = args[0] if len(args) > 0 else os.path.join(ROOT, "assets/models/bot.glb")
 OUT = args[1] if len(args) > 1 else os.path.join(ROOT, "assets/models/bot_rig.glb")
 CACHE = os.environ.get("RIG_CACHE")  # a .npz to keep the heat weights in between runs (development only)
-DEBUG = os.environ.get("RIG_DEBUG")
 
 
 # ================================================================ GLB in and out
@@ -587,10 +593,11 @@ S = G.smooth(S, 40, junction & ~STRAY)
 S = np.clip(S, 0, None)
 S /= np.maximum(S.sum(1, keepdims=True), 1e-9)
 # The arm's share at the shoulder is a smooth (harmonic, cotangent-weighted) field, pinned where the answer is clear:
-# above the armpit to the armhole seam (COLOR_0.a, the signed distance to it, + on the arm's side: none on the black
-# yoke, all of it 4.5 cm out on the shoulder cap; so the yoke stays with the chest and the cap turns, tucking under
-# the yoke's edge, with the arm); 0 on the chest's and back's middle and on the trunk's side below z 1.12; 1 on the
-# arm from 12 cm below the shoulder joint. Between, the pec, the lat and the armpit stretch smoothly after the arm.
+# above the armpit to the heat weights' share faded out inside the black yoke (COLOR_0.a is the signed distance to
+# the armhole seam, + on the arm's side: none 4 cm inside it), so the glossy yoke stays with the chest; 0 on the
+# chest's and back's middle and on the trunk's side below z 1.12; 1 on the arm from 12 cm below the shoulder joint.
+# Between, the shoulder cap, the pec, the lat and the armpit stretch smoothly after the arm (the relaxation removes
+# the heat weights' mesh-scale ripples, which crumple the surface when the arm is raised).
 def harmonic(val, fixed, region, iters=4000):
     """Laplace interpolation (cotangent weights) over region: val kept where fixed, the rest relaxed"""
     sel = region[G.E[:, 0]] | region[G.E[:, 1]]
@@ -605,12 +612,11 @@ def harmonic(val, fixed, region, iters=4000):
     return a_
 
 
-SHOULDER = os.environ.get("RIG_SHOULDER", "yoke")
 COL = accessor(J0, B0, BODY_PR["attributes"]["COLOR_0"]).astype(float) / 65535
 DCH = np.zeros((len(U), 4))
 DCH[WELD] = (COL - 0.5) * 0.1
 d_seam = DCH[:, 3]
-for sd, s in (SIDES.items() if SHOULDER != "heat" else []):
+for sd, s in SIDES.items():
     ca, cc = PARTS.index("arm_" + sd), PARTS.index("clav_" + sd)
     side = (s * x > 0.0) & ~STRAY
     drawn = side & (np.abs(d_seam) < 0.045)  # (where the seam is drawn: above its lower end)
@@ -621,10 +627,7 @@ for sd, s in (SIDES.items() if SHOULDER != "heat" else []):
     region = side & (z > 1.0) & (np.linalg.norm(U - gh, axis=1) < 0.3)
     val = S[:, ca].copy()
     top = region & (z > z_s + 0.012)
-    if SHOULDER == "seam":
-        val[top] = sstep(d_seam[top], -0.005, 0.045)
-    else:  # the heat weights' share, faded out inside the yoke
-        val[top] = val[top] * sstep(d_seam[top], -0.04, 0.0)
+    val[top] = val[top] * sstep(d_seam[top], -0.04, 0.0)
     on_arm = region & ~top & armish & (tau > 0.12)
     on_trunk = region & ~top & ~armish & ((s * x < 0.09) | (z < 1.12))
     val[on_arm], val[on_trunk] = 1.0, 0.0

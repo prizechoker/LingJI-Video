@@ -4,6 +4,8 @@
 //       `close` (关门) — the rack rolls in and the door swings shut, the camera settling in front (default dur * 0.8);
 //       `spray` (喷水) — the front is cut away top to bottom (a section), the kitchen light falls off, the tub lights
 //       up inside and the spray arms throw slow-motion water jets up into the dishes (default dur * 0.88).
+// Works from ~6.5 s; give the spray at least ~1.2 s after `spray` (the section cut takes 0.55 s, the camera then
+// eases down to the spray arm over max(0.8, dur - spray + 0.4) s).
 // p.slow (slow-motion factor for the water, default 0.1), p.exposure
 import { Studio, THREE, spot } from '../engine2/core.js';
 import { buildKitchen } from '../engine2/kitchen.js';

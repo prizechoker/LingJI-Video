@@ -21,6 +21,10 @@ const SQUAT = { root: { pos: [0, -0.33, -0.06], rot: [0.45, 0, 0] }, spine: [0.1
   armL: { shoulder: [1.1, 0.1, 0.1], elbow: 0.5, fingers: 0.3 }, armR: { shoulder: [1.1, 0.1, 0.1], elbow: 0.5, fingers: 0.3 } };
 const LOOK = { neck: [-0.2, 0.45, 0.05], head: [-0.25, 0.55, 0.12], chest: [0, 0.1, 0] };
 const FIST = { armL: { shoulder: [0.9, 0.3, 0.15], elbow: 1.45, wrist: [0, 0.3, 0], fingers: 1, thumb: 1 }, armR: { shoulder: [0.9, 0.3, 0.15], elbow: 1.45, wrist: [0, 0.3, 0], fingers: 0.55, thumb: 0.5, spread: 0.4 } };
+const UATWIST = { armL: { shoulder: [0.3, 0.9, 0.2], elbow: 1.57, fingers: 0.3 }, armR: { shoulder: [0.3, -0.7, 0.25], elbow: 1.57, fingers: 0.3 } };
+const DANCE = { root: { pos: [0.02, -0.035, 0], rot: [0.04, 0.18, 0.03] }, spine: [0.02, 0.1, 0.02], chest: [0, 0.08, 0], head: [-0.05, -0.12, 0], // (shots/gala.js at a beat's peak)
+  armL: { shoulder: [2.5, 0, 0.73], elbow: 0.15, wrist: [0.1, 0, 0], fingers: -0.15, spread: 0.6 }, armR: { shoulder: [0.2, 0, 0.18], elbow: 0.35, wrist: [0.1, 0, 0], fingers: -0.15, spread: 0.6 },
+  legL: { hip: [0.12, 0.05, 0.06], knee: 0.22, ankle: [0.08, 0, 0] }, legR: { hip: [0.12, 0.05, 0.06], knee: 0.22, ankle: [0.08, 0, 0] } };
 const COUNTER = { pos: [0, 0.88, 0.62], w: 1.4, d: 0.6 };
 const REACH = { side: 'R', target: [-0.1, 0.97, 0.34], point: 'grip', wrist: [0.15, 0.5, 0.1] };
 
@@ -60,6 +64,10 @@ const CLOSE = [
   ['cu_contact_shoes', 'run:0.1', { camera: C([1.3, 0.3, 0.5], [0, 0.15, 0.0], 30), yaw: 0 }],
   ['cu_look_neck', LOOK, { camera: C([0.6, 1.55, 1.1], [0, 1.48, 0], 30), yaw: 0 }],
   ['cu_run_upper', 'run:0.42', { camera: C([1.6, 1.35, 1.2], [0, 1.2, 0.05], 30), yaw: 0 }],
+  ['cu_uatwist', UATWIST, { camera: C([0.0, 1.35, 1.5], [0, 1.15, 0.1], 32), yaw: 0 }],
+  ['cu_dance', DANCE, { camera: C([0.2, 1.45, 1.2], [0.1, 1.4, 0], 28), yaw: 0 }],
+  ['cu_hand_fist', { armL: { shoulder: [0.5, 0, 0.1], elbow: 1.0, wrist: [0, -1.0, 0], fingers: 1, thumb: 1 } }, { camera: C([0.45, 1.42, 0.75], [0.21, 1.22, 0.42], 20), yaw: 0 }],
+  ['cu_hand_half', { armL: { shoulder: [0.5, 0, 0.1], elbow: 1.0, wrist: [0, -1.0, 0], fingers: 0.5, thumb: 0.6, spread: 0.4 } }, { camera: C([0.0, 1.3, 0.75], [0.21, 1.22, 0.42], 20), yaw: 0 }],
 ];
 
 async function render(list, scale, extra = {}) {

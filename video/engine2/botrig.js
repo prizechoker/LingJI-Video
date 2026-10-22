@@ -44,9 +44,15 @@
 //
 // Generators: idlePose(t) (seconds: breathing and a slow weight shift, the feet planted), walkPose(phase) and
 // runPose(phase) (phase in cycles, 0 = the left foot's contact; the soles stay on the floor and, when the holder moves
-// forward along its +z at gait(name).speed (m/s) with phase = t / gait(name).cycle, the stance foot stays planted).
-// runPose(0.42) is the mid-flight frame of a stride (both feet off the ground: the left leg trailing, the right
-// reaching forward). legIK(pose, side, ankleTarget) plants a foot; reachIK(rig, side, target, pole) reaches a hand.
+// forward along its +z at gait(name).speed (m/s) with phase = t / gait(name).cycle, the stance foot stays planted:
+// a walk of ~1.3 m/s, a run of ~3.1 m/s; on a treadmill keep the holder still and run the belt at that speed).
+// runPose(0.38 .. 0.44) is the flight of a stride (both feet off the ground: the left leg trailing after its push-off,
+// the right knee driven forward; 0.42 is mid-flight). legIK(pose, side, ankleTarget) plants a foot;
+// reachIK(rig, side, target, pole) reaches a hand.
+//
+// Limits: linear blend skinning with helper bones. Arms raised up to ~135 deg (hands well above the head) stay clean;
+// beyond that the shoulder caps bunch up beside the head. The fingers are fused at their bases (as modelled), so a
+// wide spread stretches the webs. Elbows past ~2.3 and knees past ~2.2 start to press into themselves.
 import { THREE } from './core.js';
 import { botMaterials } from './bot.js';
 
@@ -166,8 +172,10 @@ const softplus = (v, k) => k * Math.log1p(Math.exp(v / k));
 const smooth01 = (u) => { const t = Math.max(0, Math.min(1, u)); return t * t * (3 - 2 * t); };
 
 // The shoulder girdle's share of an arm movement (the scapulohumeral rhythm): the clavicle lifts as the arm rises past
-// ~30 degrees and draws forward as the arm reaches forward. dir: the arm's direction (shoulder to elbow) in the chest's
-// frame. The arm keeps the direction the pose asks for; only the shoulder moves.
+// ~30 degrees and draws forward as the arm reaches forward; overhead, the arm's root also rides up and out (lift, in
+// metres: the shoulder blade's upward turn), so the shoulder cap rolls up over the yoke rather than into it. dir: the
+// arm's direction (shoulder to elbow) in the chest's frame. The arm keeps the direction the pose asks for; only the
+// shoulder moves. (armX.rhythm = false switches this off; armX.lift scales the lift.)
 export function shoulderRhythm(dir) {
   const elev = Math.acos(Math.max(-1, Math.min(1, -dir.y)));
   return {
@@ -465,9 +473,9 @@ const S = (p) => Math.sin(2 * Math.PI * p);
 
 const WALK_KEYS = { // degrees over the leg's own cycle (0 = its heel strike; toe-off at 0.62)
   hip: [[0, 27], [0.12, 23], [0.3, 6], [0.5, -12], [0.6, -6], [0.72, 14], [0.86, 30], [0.95, 29]],
-  knee: [[0, 4], [0.13, 17], [0.3, 7], [0.42, 6], [0.53, 24], [0.62, 42], [0.72, 62], [0.82, 46], [0.91, 20], [0.965, 9]],
-  ankle: [[0, 0], [0.07, -6], [0.25, 4], [0.45, 9], [0.55, 0], [0.63, -15], [0.7, -7], [0.8, 1], [0.9, 2]],
-  toe: [[0, 0], [0.42, 0], [0.54, 16], [0.61, 26], [0.67, 6], [0.74, 0]],
+  knee: [[0, 4], [0.13, 17], [0.3, 7], [0.42, 6], [0.53, 24], [0.62, 42], [0.72, 62], [0.82, 44], [0.92, 12]],
+  ankle: [[0, 0], [0.07, -6], [0.25, 4], [0.41, 9], [0.49, 1], [0.57, -11], [0.63, -16], [0.71, -6], [0.8, 1], [0.9, 2]],
+  toe: [[0, 0], [0.4, 0], [0.5, 14], [0.58, 24], [0.65, 8], [0.73, 0]],
 };
 
 function walkAngles(phase, o = {}) {
@@ -539,7 +547,15 @@ function table(name) {
   const yy = sol.map((q) => smax(-q.L.minY, -q.R.minY, 0.0015));
   let w; // stance weights (left, right)
   if (name === 'walk') {
-    w = sol.map((q) => { const l = 1 / (1 + Math.exp((q.L.minY - q.R.minY) / 0.003)); return [l, 1 - l]; });
+    // the lower foot carries the weight, but never one still in its swing (a heel coming down only grazes)
+    const swing = (p) => { p -= Math.floor(p); return p > 0.64 && p < 0.995; };
+    w = sol.map((q, i) => {
+      const ph = i / N;
+      let l = 1 / (1 + Math.exp((q.L.minY - q.R.minY) / 0.003));
+      if (swing(ph)) l = 0;
+      if (swing(ph + 0.5)) l = 1;
+      return [l, 1 - l];
+    });
   } else {
     // stance: the left foot 0 .. 0.34, the right 0.5 .. 0.84; in flight the hips follow a smooth arc
     const win = (p, a, b) => (p >= a - 1e-9 && p <= b + 1e-9 ? 1 : 0);
