@@ -54,8 +54,8 @@ export async function buildRoom(st, { seed = 3 } = {}) {
   const throwMat = new THREE.MeshPhysicalMaterial({ ...chairFab, color: 0xc9a77c, roughness: 0.95, sheen: 0.6, sheenColor: new THREE.Color(0xf0dcc0) });
   const oak = st.pbr('Wood022', { repeat: [1, 1] });
   const oakMat = new THREE.MeshPhysicalMaterial({ ...oak, color: 0xe8dccb, roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.3 });
-  const walnut = st.pbr('Wood027', { repeat: [1, 1] });
-  const walnutMat = new THREE.MeshPhysicalMaterial({ ...walnut, color: 0xd8cbbf, roughness: 0.45, clearcoat: 0.35, clearcoatRoughness: 0.25 });
+  const walnut = st.pbr('Wood026', { repeat: [1, 1] });
+  const walnutMat = new THREE.MeshPhysicalMaterial({ ...walnut, color: 0xb5a89c, roughness: 0.45, clearcoat: 0.35, clearcoatRoughness: 0.25 });
   const blackMetal = new THREE.MeshStandardMaterial({ color: 0x1c1d1f, roughness: 0.45, metalness: 0.7 });
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xe9e4dc, roughness: 0.9 });
   const capMat = new THREE.MeshStandardMaterial({ color: 0x2b2a28, roughness: 0.9 });
@@ -69,9 +69,9 @@ export async function buildRoom(st, { seed = 3 } = {}) {
   // ---------------------------------------------------------------- floor, walls (windows in the +x wall)
   const { x0, x1, z0, z1, wall, h } = ROOM;
   const fg = new THREE.PlaneGeometry(x1 - x0 + 0.4, z1 - z0 + 0.4).rotateX(-Math.PI / 2);
-  // uv in metres / 1.6 so the planks keep their real size
+  // uv in metres / 3 so the planks keep a real size
   const uv = fg.attributes.uv, fp = fg.attributes.position;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, fp.getX(i) / 1.6, fp.getZ(i) / 1.6);
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, fp.getX(i) / 3.0, fp.getZ(i) / 3.0);
   const floor = add(fg, floorMat, { cast: false, name: 'floor' });
   const wallBox = (w, d, x, z, y0 = 0, y1 = h) => {
     add(new THREE.BoxGeometry(w, y1 - y0, d).translate(x, (y0 + y1) / 2, z), wallMat);
