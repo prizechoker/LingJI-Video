@@ -1,7 +1,7 @@
 // Style frame: the robot's hand loses a wet porcelain bowl over the sink (high-speed, frozen droplets).
 import { Studio, THREE, spot } from '../engine2/core.js';
-import { loadRobot } from '../engine2/robot.js';
-import { handRig, poseHand, padPoint } from '../engine2/robothand.js';
+import { botMaterial } from '../engine2/bot.js';
+import { loadBotHand, solvePinch, padPoint, FOREARM } from '../engine2/bothand.js';
 import { buildKitchen, COUNTER } from '../engine2/kitchen.js';
 import { buildBowl, bowlGeometry, surfaceDroplets, waterMaterial, waterInBowl, spillStream } from '../engine2/dishes.js';
 
@@ -19,28 +19,23 @@ export async function setup({ scale, params }) {
   st.scene.add(kitchen);
   const water = waterMaterial();
 
-  // ---- the hand in a pinch pose; the bowl stands upright over the sink and the hand is put on its rim
-  const r = await loadRobot(st);
-  const h = handRig(r, 'R');
-  st.scene.add(h.rig);
-  const grip = params.grip || {
-    wrist: [0.25, 0, 0], index: [0.55, 0.7, 0.45], middle: [0.6, 0.75, 0.45], ring: [0.7, 0.8, 0.5], little: [0.75, 0.85, 0.5],
-    thumb: [0.35, 0.25, 0.2], thumbBase: [0.5, 0.0],
-  };
-  poseHand(h, grip);
+  // ---- the robot's hand in a rim pinch (solved in hand space); the bowl stands upright over the sink and the hand
+  // is put on its rim
+  const h = await loadBotHand(st, { material: botMaterial({ white: 0xdfe2e6, envDiffuse: params.handEnv ?? 0.9, seam: 0.0005, dark: 0.7 }) });
+  st.scene.add(h.holder);
+  const pinch = solvePinch(h, params.gap ?? 0.0045);
   const V3 = (...a) => new THREE.Vector3(...a);
   const basis = (x, y) => new THREE.Matrix4().makeBasis(x, y, V3().crossVectors(x, y));
-  const tP = padPoint(h, 'thumb'), fP = padPoint(h, 'index').lerp(padPoint(h, 'middle'), 0.5);
+  const tP = padPoint(h, 1), fP = padPoint(h, 2).lerp(padPoint(h, 3), 0.5);
   const R0 = tP.clone().lerp(fP, 0.5);
   const nW = fP.clone().sub(tP).normalize();  // from the thumb (inside the bowl) to the fingers (outside)
-  const wristP = h.wrist.getWorldPosition(V3());
+  const wristP = h.bones.hand.getWorldPosition(V3());
   const uH = wristP.clone().sub(R0);
   uH.addScaledVector(nW, -uH.dot(nW)).normalize();
   const handF = basis(nW, uH).transpose();
-  const fRest = wristP.clone().sub(h.elbow.getWorldPosition(V3())).normalize();
-  const j31 = h.joint('f31');
-  const palmRest = j31.localToWorld(V3(0, 1, 0)).sub(j31.getWorldPosition(V3()));
-  console.warn('pinch gap mm', (tP.distanceTo(fP) * 1000).toFixed(1));
+  const fRest = FOREARM.clone().negate();  // elbow -> wrist
+  const palmRest = V3(0, -1, 0);
+  console.warn('pinch gap mm', (pinch.gap * 1000).toFixed(1), 'err', pinch.err.toFixed(4));
 
   const cam = { pos: params.cpos || [-0.2, 0.97, 0.1], look: params.look || [0.0, 1.0, -0.24], fov: params.fov ?? 26 };
   const g = bowlGeometry();
@@ -62,9 +57,9 @@ export async function setup({ scale, params }) {
   }
   console.warn('grip phi', best.phi, 'tilt', best.tilt, 'score', best.score.toFixed(3));
   const rimP = base.clone().add(V3(0, g.userData.rimY, 0)).addScaledVector(best.nb, g.userData.rimR);
-  h.rig.quaternion.setFromRotationMatrix(best.M);
-  h.rig.position.copy(rimP).sub(R0.clone().applyMatrix4(best.M));
-  h.rig.updateMatrixWorld(true);
+  h.holder.quaternion.setFromRotationMatrix(best.M);
+  h.holder.position.copy(rimP).sub(R0.clone().applyMatrix4(best.M));
+  h.holder.updateMatrixWorld(true);
   // the bowl now: pivoted off the fingertips (its far side swinging down) and dropping
   const bowl = buildBowl();
   const slip = params.slip ?? 1.0;
@@ -112,7 +107,7 @@ export async function setup({ scale, params }) {
     drops.add(m);
   }
   for (let k = 0; k < 14; k++) {  // drips from the fingertips
-    const p = padPoint(h, ['index', 'middle', 'ring'][k % 3], 0.95, 0.002);
+    const p = padPoint(h, [2, 3, 4][k % 3], 0.95, 0.002);
     const rr = 0.0012 + R() * 0.0012;
     const m = new THREE.Mesh(sph, water);
     m.position.copy(p).add(new THREE.Vector3((R() - 0.5) * 0.004, -0.004 - R() * 0.05 * (k / 14), (R() - 0.5) * 0.004));
