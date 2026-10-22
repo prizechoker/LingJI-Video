@@ -27,21 +27,26 @@ export async function create({ renderer, scale, p, cues }) {
   st.scene.background = new THREE.Color(0x040507);
   const set = await buildGoSet(st);
   st.scene.add(set.group);
+  // the stone placed: move N at its point, or (p.at = [x, z], p.color) a stone laid anywhere, e.g. on the board's
+  // margin to resign; side 'W' = the hand comes from White's side (-z)
   const N = p.move ?? 37;
-  const [col, mi, mj] = set.moves[N - 1];
-  set.show(N - 1);
+  const [col0, mi, mj] = set.moves[Math.min(N, set.moves.length) - 1];
+  const col = p.color || col0;
+  set.show(p.n ?? N - 1);
   const stone = new THREE.Mesh(set.geo, set.mats[col === 'B' ? 'black' : 'white']);
   stone.castShadow = stone.receiveShadow = true;
   stone.matrixAutoUpdate = false;
   st.scene.add(stone);
-  const rest = restPose({ i: mi, j: mj, n: N });
+  const rest = p.at ? { p: V3(p.at[0], 0.0046, p.at[1]), rot: 0.7 } : restPose({ i: mi, j: mj, n: N });
+  const flip = p.side === 'W' ? Math.PI : 0;
   const restQ = new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), rest.rot);
 
   // the hand in the grip; where its holder must be for the stone to sit on the point
   const h = await placingHand(st);
   h.holder.add(buildSleeve(st));
   st.scene.add(h.holder);
-  const pitch0 = GRIP.pitch, yaw0 = GRIP.yaw;
+  const pitch0 = GRIP.pitch, yaw0 = GRIP.yaw + flip;
+  h.holder.rotation.set(pitch0, yaw0, 0, 'YXZ');
   h.holder.position.set(0, 0, 0);
   h.holder.updateMatrixWorld(true);
   const nail = fingerPoint(h, 'f2_3', 1);
@@ -63,7 +68,7 @@ export async function create({ renderer, scale, p, cues }) {
     m.position.set(x, y, z);
     st.scene.add(m);
   }
-  const cam = CAMS[p.cam || 'hero'];
+  const cam = p.camera || CAMS[p.cam || 'hero'];
   st.camera.near = p.near ?? 0.01;
   grade(st, {
     ao: { radius: 0.012, intensity: 2.0, falloff: 0.5 },
@@ -75,8 +80,8 @@ export async function create({ renderer, scale, p, cues }) {
   const tc = cues.contact ?? p.contact ?? 1.6;
   const slow = p.slow ?? 1;
   const APPROACH = 0.85, RETRACT = 0.8; // real seconds
-  const hover = V3(0.012, 0.075, 0.11); // where the approach starts, from the contact position (up, toward Black)
-  const away = V3(-0.01, 0.06, 0.12);
+  const hover = V3(0.012, 0.075, 0.11).applyAxisAngle(V3(0, 1, 0), flip); // where the approach starts (up, toward the player)
+  const away = V3(-0.01, 0.06, 0.12).applyAxisAngle(V3(0, 1, 0), flip);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pp = V3(), sc = V3();
   const qa = new THREE.Quaternion(), pa = V3();
 

@@ -5,7 +5,7 @@ import { THREE } from './core.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { stoneGeometry, stoneMaterials } from './materials.js';
 
-export const BOARD = { w: 0.424, d: 0.455, h: 0.12, dx: 0.0222, dz: 0.0237 };
+export const BOARD = { w: 0.424, d: 0.455, h: 0.08, dx: 0.0222, dz: 0.0237 };
 export const at = (i, j, y = 0) => new THREE.Vector3((i - 9) * BOARD.dx, y, (j - 9) * BOARD.dz);
 
 function loadImage(url) {
@@ -22,7 +22,7 @@ function kayaGrain(N) {
   const M = N * 2;
   const prof = new Float32Array(M);
   for (let x = 0; x < M; x += 5 + R() * 10) {
-    const d = 0.03 + R() * R() * 0.16, w = 0.8 + R() * 2.2;
+    const d = 0.06 + R() * R() * 0.3, w = 0.8 + R() * 2.4;
     for (let u = -8; u < 24; u++) {
       const k = Math.floor(x) + u;
       if (k < 0 || k >= M) continue;
@@ -33,11 +33,11 @@ function kayaGrain(N) {
   // broad bands (growth seasons) and a slow drift of tone
   const band = new Float32Array(M);
   const ph = [R() * 6.28, R() * 6.28, R() * 6.28];
-  for (let k = 0; k < M; k++) band[k] = 0.05 * Math.sin(k / 97 + ph[0]) * Math.sin(k / 431 + ph[1]) + 0.035 * Math.sin(k / 1630 + ph[2]);
+  for (let k = 0; k < M; k++) band[k] = 0.07 * Math.sin(k / 97 + ph[0]) * Math.sin(k / 431 + ph[1]) + 0.05 * Math.sin(k / 1630 + ph[2]) + 0.03 * Math.sin(k / 41 + ph[1]) * Math.sin(k / 263 + ph[0]);
   return { prof, band, M, R };
 }
 
-function buildTop() {
+export function buildTop() {
   const N = 4096;
   const { prof, band, M, R } = kayaGrain(N);
   const img = new ImageData(N, N);
@@ -53,7 +53,7 @@ function buildTop() {
       const k = ((k0 % M) + M) % M, k1 = (k + 1) % M;
       const g = prof[k] * (1 - f) + prof[k1] * f;
       const b = band[k];
-      const t = Math.min(1, g * 1.6);
+      const t = Math.min(1, g * 1.9);
       const i = (y * N + x) * 4;
       const lum = 1 + b;
       img.data[i] = (base[0] + (dark[0] - base[0]) * t) * lum;

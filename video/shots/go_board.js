@@ -11,7 +11,7 @@
 import { Studio, THREE, spot } from '../engine2/core.js';
 import { BOARD } from '../engine2/goban.js';
 import { buildGoSet, position } from './lib/goset.js';
-import { ss, sstep, clamp, lerp, breathe, grade, caption, text, FONT, toScreen, V3, rng, measure } from './lib/kit.js';
+import { ss, sstep, clamp, lerp, breathe, grade, caption, text, FONT, toScreen, V3, rng, measure, quote } from './lib/kit.js';
 
 const P10 = [14, 9];
 const CAMS = {
@@ -281,31 +281,4 @@ export async function create({ renderer, scale, p, cues, dur }) {
       if (p.quote) quote(g, t, p.quote);
     },
   };
-}
-
-// a quotation set large in the frame, line by line, with its attribution
-export function quote(g, t, Q) {
-  const at = Q.at ?? 0.4;
-  const lines = Q.lines;
-  const step = Q.step ?? 1.2;
-  const size = Q.size ?? 54;
-  const x = Q.x ?? 960, y0 = Q.y ?? 540 - ((lines.length - 1) * size * 1.65) / 2 - 30;
-  lines.forEach((ln, i) => {
-    const t0 = (Q.times && Q.times[i]) ?? at + i * step;
-    const a = sstep(t0, t0 + 0.7, t) * (1 - sstep(Q.out ?? 1e9, (Q.out ?? 1e9) + 0.8, t));
-    if (a <= 0.001) return;
-    const segs = Array.isArray(ln) ? ln : [{ t: ln }];
-    let w = 0;
-    for (const s of segs) w += measure(g, s.t, { size, font: FONT.serif, weight: 600, spacing: 4 });
-    let cx = x - w / 2;
-    for (const s of segs) {
-      text(g, s.t, cx, y0 + i * size * 1.65 + (1 - a) * 8, { size, font: FONT.serif, weight: 600, spacing: 4, color: s.c || [244, 238, 228], a, align: 'left', shadow: 26, shadowColor: 'rgba(0,0,0,0.9)' });
-      cx += measure(g, s.t, { size, font: FONT.serif, weight: 600, spacing: 4 });
-    }
-  });
-  if (Q.by) {
-    const t0 = (Q.byAt ?? at + lines.length * step);
-    const a = sstep(t0, t0 + 0.8, t) * (1 - sstep(Q.out ?? 1e9, (Q.out ?? 1e9) + 0.8, t));
-    text(g, Q.by, x + (Q.byX ?? 260), y0 + lines.length * size * 1.65 + 10, { size: 28, font: FONT.serif, weight: 500, spacing: 6, color: [214, 200, 178], a, align: 'center', shadow: 16 });
-  }
 }
