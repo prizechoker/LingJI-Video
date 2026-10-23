@@ -56,7 +56,12 @@ Run from `video/`:
 ## Building blocks
 
 - `engine2/core.js` — `Studio` (`hdri(url, {intensity, rotation, background})`, `pbr(name, {repeat})` for
-  `assets/textures/<name>_{Color,NormalGL,Roughness}.jpg`, `post()`, `render()`), `spot(color, intensity, {...})`.
+  `assets/textures/<name>_{Color,NormalGL,Roughness}.jpg`, `post()`, `render()`), `spot(color, intensity, {...})`
+  (on the board, where stones are a few mm thick, pass `normalBias: 0.0004` or stone shadows lift off into rings).
+- `lib/grasp.js` — closing a hand on an object given as a signed distance function (`sdf.cylinder/sphere/union`):
+  `wrap` curls each finger with its joints coupled (good for a palm round a body); `wrapSeq` bends joint by joint
+  from the root (fingers hooking round an edge or a cup); `lib/pinch.js` `rimGrip` and `engine2/bothand.js`
+  `solvePinch` for a thumb-to-fingertip pinch (works for the human hand too).
 - `lib/kit.js` — easing (`ss`, `sstep`, `easeOut`, `key(t, [[t0, v0], [t1, v1], ...])`), `rng`, `V3`, `breathe`
   (handheld drift), `grade(st, o)` (house post: N8AO, DOF, bloom, AgX, vignette), typography (`title`, `caption`,
   `quote`, `callout` for a label pinned to a 3D point, `text`, `measure`, `FONT`), `toScreen(cam, p)`,
