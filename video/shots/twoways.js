@@ -75,6 +75,10 @@ async function sink(renderer, scale) {
   await st.hdri('../assets/hdri/blinds_2k.hdr', { intensity: 0.42, rotation: 2.1, background: { blur: 0.09, intensity: 0.45 } });
   const kitchen = buildKitchen(st, { width: 2.4 });
   st.scene.add(kitchen);
+  // brushed steel picks up the warm room and reads pink: cool it a touch, as in the hands' wash shot
+  kitchen.traverse((o) => {
+    if (o.isMesh && o.material && o.material.metalness === 1) { o.material = o.material.clone(); o.material.color.set(0xa1b4c0); o.material.roughness = Math.max(o.material.roughness, 0.36); }
+  });
   const pm = porcelainMaterial();
   const glazes = [pm, pm, new THREE.MeshPhysicalMaterial({ color: 0xbfd2c4, roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05 }), new THREE.MeshPhysicalMaterial({ color: 0xece6da, roughness: 0.25, clearcoat: 0.8 }), new THREE.MeshPhysicalMaterial({ color: 0x2f4a66, roughness: 0.2, clearcoat: 1 })];
   const bowlG = bowlGeometry();

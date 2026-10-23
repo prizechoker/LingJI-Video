@@ -1,10 +1,16 @@
 // Burned-in subtitles: serif, bottom centre, keyword highlights. Exactly one line on screen at a time.
 import { PAL } from './stage.js';
-import { richText } from './draw.js';
+import { richText, measure, FONT } from './draw.js';
 import { smoothstep } from './math.js';
 
 const COLORS = { gold: PAL.gold, cyan: [150, 214, 255], warm: PAL.warm, red: PAL.red };
 const LEAD = 0.08; // appear slightly before the voice
+
+// the largest size up to `size` at which the line fits in `maxW` (a long quotation shrinks rather than run off-frame)
+function fit(ui, segs, size, spacing, maxW) {
+  const w = segs.reduce((p, g) => p + measure(ui, g.t, { size, font: FONT.serif, weight: 600, spacing }), 0);
+  return w > maxW ? Math.floor(size * maxW / w) : size;
+}
 
 // soft darkening behind the text: present while any line is on (or about to be), so it never flickers between lines
 function backdrop(t, subs, k) {
@@ -46,17 +52,21 @@ export function drawSubtitles(pen, t, subs) {
     const aq = smoothstep(tIn - 0.1, tIn + 0.45, t) * (1 - smoothstep(s.end + 0.05, s.end + 0.5, t)) * (next ? 1 - smoothstep(next.start - LEAD - 0.15, next.start - LEAD, t) : 1);
     if (aq <= 0.001) return;
     ui.save();
-    ui.globalAlpha = 0.55 * aq;
-    const sh = ui.createRadialGradient(960, 540, 60, 960, 540, 760);
-    sh.addColorStop(0, 'rgba(0,0,0,0.6)');
+    // a wide, soft ellipse of shade behind the line, dark enough to read it over a full board
+    ui.globalAlpha = aq;
+    ui.translate(960, 540);
+    ui.scale(2.6, 1);
+    const sh = ui.createRadialGradient(0, 0, 0, 0, 0, 300);
+    sh.addColorStop(0, 'rgba(0,0,0,0.72)');
+    sh.addColorStop(0.55, 'rgba(0,0,0,0.5)');
     sh.addColorStop(1, 'rgba(0,0,0,0)');
     ui.fillStyle = sh;
-    ui.fillRect(0, 140, 1920, 800);
+    ui.fillRect(-370, -300, 740, 600);
     ui.restore();
     const lift = (1 - smoothstep(tIn - 0.1, tIn + 0.6, t)) * 10;
-    richText(ui, segs, 960, 540 + lift, { size: 60, weight: 600, a: aq, spacing: 5, color: [246, 240, 230], shadow: 30, shadowColor: 'rgba(0,0,0,0.9)' });
+    richText(ui, segs, 960, 540 + lift, { size: fit(ui, segs, 60, 5, 1640), weight: 600, a: aq, spacing: 5, color: [246, 240, 230], shadow: 30, shadowColor: 'rgba(0,0,0,0.9)' });
     return;
   }
   const rise = (1 - smoothstep(tIn, tIn + 0.25, t)) * 5;
-  richText(ui, segs, 960, 968 + rise, { size: 46, weight: 600, a, spacing: 2, color: [244, 239, 231], shadow: 14, shadowColor: 'rgba(0,0,0,0.85)' });
+  richText(ui, segs, 960, 968 + rise, { size: fit(ui, segs, 46, 2, 1760), weight: 600, a, spacing: 2, color: [244, 239, 231], shadow: 14, shadowColor: 'rgba(0,0,0,0.85)' });
 }

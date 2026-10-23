@@ -68,7 +68,12 @@ export async function create({ renderer, scale, p, cues }) {
     m.position.set(x, y, z);
     st.scene.add(m);
   }
-  const cam = p.camera || CAMS[p.cam || 'hero'];
+  // the presets are framed on move 37 (P10); for any other move they slide across the board to follow the stone
+  const base = p.camera || CAMS[p.cam || 'hero'];
+  const ref = restPose({ i: 14, j: 9, n: 37 }).p;
+  const dx = p.camera || p.at || N === 37 ? 0 : rest.p.x - ref.x, dz = p.camera || p.at || N === 37 ? 0 : rest.p.z - ref.z;
+  const slide = (c) => c && { ...c, pos: [c.pos[0] + dx, c.pos[1], c.pos[2] + dz], look: [c.look[0] + dx, c.look[1], c.look[2] + dz], to: slide(c.to) };
+  const cam = slide(base);
   st.camera.near = p.near ?? 0.01;
   grade(st, {
     ao: { radius: 0.012, intensity: 2.0, falloff: 0.5 },

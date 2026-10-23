@@ -125,9 +125,10 @@ export class Studio {
       this.dof = new DepthOfFieldEffect(this.camera, {
         worldFocusDistance: dof.distance, worldFocusRange: dof.range, bokehScale: dof.bokeh ?? 3, resolutionScale: dof.res ?? 0.5,
       });
-      // the fill pass is a max() over 16 taps that pops bokeh highlights; on thin dark detail (the board's ink lines)
-      // it erodes the blur into double, bevel-like edges, so unless asked for it is made an identity
-      if (!dof.fill) for (const p of [this.dof.bokehNearFillPass, this.dof.bokehFarFillPass]) p.fullscreenMaterial.uniforms.kernel16.value = new Float64Array(32);
+      // the far fill pass is a max() over 16 taps that pops bokeh highlights; on thin dark detail behind the focus
+      // (the board's ink lines) it erodes the blur into double, bevel-like edges, so unless asked for it is an identity.
+      // The near one stays: it is what keeps an out-of-focus hand in front solid instead of see-through
+      if (!dof.fill) this.dof.bokehFarFillPass.fullscreenMaterial.uniforms.kernel16.value = new Float64Array(32);
       c.addPass(new EffectPass(this.camera, this.dof));
     }
     const fx = [];

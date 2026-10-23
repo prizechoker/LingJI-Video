@@ -224,7 +224,7 @@ async function washShot(st, { p, dur, top, kitchen, lights }) {
   st.scene.add(splash);
   const drops = Array.from({ length: 60 }, () => ({ ph: R(), a: R() * Math.PI * 2, sp: 0.15 + R() * 0.45, up: 0.3 + R() * 0.5, r: 0.0005 + R() ** 2 * 0.0014 }));
   // the pooled water by reflection alone: a transmissive surface here refracts the hand under the bowl and goes pink
-  const poolMat = new THREE.MeshPhysicalMaterial({ color: 0xdde8f0, transparent: true, opacity: 0.26, roughness: 0.03, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.1, depthWrite: false });
+  const poolMat = new THREE.MeshPhysicalMaterial({ color: 0xe6f1f5, transparent: true, opacity: 0.2, roughness: 0.03, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 0.45, depthWrite: false });
   let pool = null;
   const ray = new THREE.Raycaster();
   const m4 = new THREE.Matrix4(), sc = V3(), qI = new THREE.Quaternion();

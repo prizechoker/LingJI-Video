@@ -105,7 +105,7 @@ def storyboard():
     S.append(shot("hall", A("B15", "$", 0.6), A("B16", "他看着", -0.1), p=dict(mode="watch", caption=dict(name="黄士杰", en="AJA HUANG · DEEPMIND", role="DeepMind 工程师")),
                   cues=dict(screen=A("B16", "^", 0.6), aja=A("B16", "黄士杰", -0.2)), fadeIn=0.25))
     t0, t1, t2 = A("B16", "他看着", -0.1), A("B16", "用自己的手", -0.1), A("B16", "落下了", -0.1)
-    S.append(shot("go_place", t0, t1, p=dict(move=39, cam="top", slow=1.0, push=0.05), cues=dict(contact=t1 - 0.25)))
+    S.append(shot("go_place", t0, t1, p=dict(move=39, cam="top", slow=1.0, push=0.05, range=0.14), cues=dict(contact=t1 - 0.25)))
     S.append(shot("go_place", t1, t2, p=dict(move=41, cam="hero", slow=1.0, push=0.05), cues=dict(contact=t2 - 0.3)))
     S.append(shot("go_place", t2, A("B16", "$", 0.7), p=dict(move=43, cam="low", slow=1.2, push=0.08), cues=dict(contact=A("B16", "每一颗", 0.2))))
     S.append(shot("botreach", A("B16", "$", 0.7), A("B17", "$", 1.2), cues=dict(freeze=A("B17", "拿不起", -0.1)), fadeIn=0.35))

@@ -314,7 +314,8 @@
     "move": 39,
     "cam": "top",
     "slow": 1.0,
-    "push": 0.05
+    "push": 0.05,
+    "range": 0.14
    },
    "cues": {
     "contact": 113.204
