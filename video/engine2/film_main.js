@@ -32,3 +32,4 @@ window.__init = async (opts = {}) => {
 };
 
 window.__frame = async (t, fi) => film.frame(t, fi);
+window.__film = () => film; // for profiling tools
