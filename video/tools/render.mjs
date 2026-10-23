@@ -48,9 +48,9 @@ const started = Date.now();
 let done = 0;
 const todoFrames = segs.reduce((n, [a, b], i) => n + (fs.existsSync(segFile(i) + '.done') ? 0 : b - a), 0);
 
-async function worker(k, first, last) {
+async function worker(k, list) {
   let browser = null, page = null;
-  for (let i = first; i < last; i++) {
+  for (const i of list) {
     const seg = segFile(i);
     if (fs.existsSync(seg + '.done')) continue;
     if (!page) {
@@ -94,9 +94,10 @@ async function worker(k, first, last) {
   if (browser) await browser.close();
 }
 
-// contiguous blocks of segments per worker, balanced by remaining frames
-const per = Math.ceil(segs.length / workers);
-await Promise.all(Array.from({ length: workers }, (_, k) => worker(k, k * per, Math.min(segs.length, (k + 1) * per))));
+// contiguous runs of the segments still to do, split evenly between the workers (so a resumed render stays balanced)
+const left = segs.map((_, i) => i).filter((i) => !fs.existsSync(segFile(i) + '.done'));
+const per = Math.ceil(left.length / workers);
+await Promise.all(Array.from({ length: workers }, (_, k) => worker(k, left.slice(k * per, (k + 1) * per))));
 srv.close();
 const list = path.join(tmpDir, 'list.txt');
 fs.writeFileSync(list, segs.map((_, i) => `file '${segFile(i)}'`).join('\n'));
