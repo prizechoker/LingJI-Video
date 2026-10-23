@@ -118,7 +118,8 @@ export class Film2 {
       if (!inst.overlay) continue;
       g.save();
       g.globalAlpha = a;
-      inst.overlay(g, t - s.start, { ...env, shot: s, alpha: a });
+      // a glitch in one overlay costs that overlay on that frame, not an hours-long render
+      try { inst.overlay(g, t - s.start, { ...env, shot: s, alpha: a }); } catch (e) { console.error(`overlay ${s.id} @${t.toFixed(3)}: ${e.message}`); }
       g.restore();
     }
     this.blacks(t);

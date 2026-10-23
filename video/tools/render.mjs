@@ -66,9 +66,22 @@ async function worker(k, first, last) {
       '-c:v', 'libx264', '-preset', 'slow', '-crf', crf, '-pix_fmt', 'yuv420p', '-tune', 'film', seg], { stdio: ['pipe', 'inherit', 'inherit'] });
     const canvas = page.locator('#out');
     const ts = Date.now();
+    let last = null;
     for (let f = a; f < b; f++) {
-      await page.evaluate(([tt, fi]) => window.__frame(tt, fi), [f / fps, f]);
-      const buf = await canvas.screenshot({ type: 'png' });
+      // a frame that throws is retried once, then logged and replaced by the previous frame: hours of render
+      // should not die on one bad frame (fix it and re-render that segment instead)
+      let buf = null;
+      for (let attempt = 0; attempt < 2 && !buf; attempt++) {
+        try {
+          await page.evaluate(([tt, fi]) => window.__frame(tt, fi), [f / fps, f]);
+          buf = await canvas.screenshot({ type: 'png' });
+        } catch (e) {
+          console.log(`[w${k}] frame ${f} (${(f / fps).toFixed(3)}s) failed${attempt ? ', reusing the previous frame' : ', retrying'}: ${e.message.split('\n')[0]}`);
+        }
+      }
+      buf = buf || last;
+      if (!buf) throw new Error(`frame ${f} failed with no previous frame to fall back on`);
+      last = buf;
       if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once('drain', r));
       done++;
     }
