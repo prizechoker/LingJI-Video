@@ -3,7 +3,8 @@
 //           test:<name> | a pose object)
 //         shots: instead of poses, a list of { pose, cam | camera, yaw, reach, counter } (frame t renders shots[t])
 //         cam: full | side | back | f34 | mid | top | close (with look/fov) or camera: {pos, look, fov}
-//         yaw, markers (joint dots), wbone (paint the weight of one bone), xray (the body see-through)
+//         yaw, markers (joint dots), wbone (paint the weight of one bone, or phi_L / phi_R: the arm's share of the
+//         shoulder's swing), xray (the body see-through), raw (the skin weights as exported, without engine2/botjoint.js)
 import { Studio, THREE, spot } from '../engine2/core.js';
 import { botMaterials } from '../engine2/bot.js';
 import { loadBotRig, restPose, idlePose, walkPose, runPose, reachIK, handPoint, gait, soles } from '../engine2/botrig.js';
@@ -47,7 +48,7 @@ export async function setup({ scale, params }) {
   floor.receiveShadow = true;
   st.scene.add(floor);
 
-  const rig = await loadBotRig(st, { mats: botMaterials({ envDiffuse: params.envDiffuse ?? 0.35, white: params.white ?? 0xd9dce0 }) });
+  const rig = await loadBotRig(st, { shoulders: !params.raw, mats: botMaterials({ envDiffuse: params.envDiffuse ?? 0.35, white: params.white ?? 0xd9dce0 }) });
   rig.holder.rotation.y = params.yaw ?? 0.22;
   st.scene.add(rig.holder);
   if (params.wbone) paintWeights(rig, params.wbone);
@@ -150,10 +151,23 @@ function paintWeights(rig, name) {
     const names = name.split(',');
     const bis = new Set(m.skeleton.bones.map((b, i) => (names.includes(b.name) ? i : -1)).filter((i) => i >= 0));
     const g = m.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+    let phi = null;
+    if (/^phi_[LR]$/.test(name)) {
+      const sd = name.slice(4);
+      phi = new Map();
+      m.skeleton.bones.forEach((b, i) => {
+        if (!b.name.endsWith('_' + sd) || /clavicle|thigh|shin|foot|toe|hip/.test(b.name)) return;
+        phi.set(i, b.name.startsWith('x_shoulder2') ? 2 / 3 : b.name.startsWith('x_shoulder') ? 1 / 3 : 1);
+      });
+    }
     const c = new Float32Array(si.count * 3);
     for (let i = 0; i < si.count; i++) {
       let w = 0;
       for (let k = 0; k < 4; k++) if (bis.has(si.getComponent(i, k))) w += sw.getComponent(i, k);
+      if (phi) { // the arm's effective share of the shoulder's swing (the half-way bones count a third, two thirds)
+        w = 0;
+        for (let k = 0; k < 4; k++) w += sw.getComponent(i, k) * (phi.get(si.getComponent(i, k)) || 0);
+      }
       if (names.includes('#stripes')) w = (Math.floor(w * 10) % 2) * 0.5 + w * 0.5;
       const col = new THREE.Color().setHSL(0.66 * (1 - w), 0.9, 0.18 + 0.4 * w);
       c.set([col.r, col.g, col.b], i * 3);

@@ -31,8 +31,8 @@ function dancePose(t, k) {
   return {
     root: { pos: [0.02 * s, -0.035 + 0.025 * Math.abs(c), 0], rot: [0.04, 0.18 * s, 0.03 * s] },
     spine: [0.02, 0.1 * s, 0.02 * s], chest: [0.0, 0.08 * s, 0], head: [-0.05, -0.12 * s, 0],
-    armL: { shoulder: [0.2 + 2.0 * ss(up(s)), 0.0, 0.18 + 0.5 * ss(up(s))], elbow: 0.35 - 0.2 * up(s), wrist: [0.1, 0, 0], fingers: -0.15, spread: 0.6 },
-    armR: { shoulder: [0.2 + 2.0 * ss(up(-s)), 0.0, 0.18 + 0.5 * ss(up(-s))], elbow: 0.35 - 0.2 * up(-s), wrist: [0.1, 0, 0], fingers: -0.15, spread: 0.6 },
+    armL: { shoulder: [0.2 + 1.6 * ss(up(s)), 0.0, 0.18 + 0.62 * ss(up(s))], elbow: 0.35 + 0.1 * up(s), wrist: [0.1, 0, 0], fingers: -0.15, spread: 0.6 },
+    armR: { shoulder: [0.2 + 1.6 * ss(up(-s)), 0.0, 0.18 + 0.62 * ss(up(-s))], elbow: 0.35 + 0.1 * up(-s), wrist: [0.1, 0, 0], fingers: -0.15, spread: 0.6 },
     legL: { hip: [0.12 + 0.08 * Math.abs(c), 0.05, 0.06], knee: 0.22 + 0.14 * Math.abs(c), ankle: [0.08, 0, 0] },
     legR: { hip: [0.12 + 0.08 * Math.abs(c), 0.05, 0.06], knee: 0.22 + 0.14 * Math.abs(c), ankle: [0.08, 0, 0] },
   };

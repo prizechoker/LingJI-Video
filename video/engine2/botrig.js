@@ -50,11 +50,13 @@
 // the right knee driven forward; 0.42 is mid-flight). legIK(pose, side, ankleTarget) plants a foot;
 // reachIK(rig, side, target, pole) reaches a hand.
 //
-// Limits: linear blend skinning with helper bones. Arms raised up to ~135 deg (hands well above the head) stay clean;
-// beyond that the shoulder caps bunch up beside the head. The fingers are fused at their bases (as modelled), so a
+// Limits: linear blend skinning with helper bones; at load the shoulders' weights are corrected (engine2/botjoint.js:
+// the flank no longer follows a raised arm, the shoulder cap blends over its whole width). Arms raised up to ~120 deg
+// (a wave, the hand above the head) stay clean; beyond that the top of the shoulder starts to crease beside the neck. The fingers are fused at their bases (as modelled), so a
 // wide spread stretches the webs. Elbows past ~2.3 and knees past ~2.2 start to press into themselves.
 import { THREE } from './core.js';
 import { botMaterials } from './bot.js';
+import { freeFlanks } from './botjoint.js';
 
 const V3 = THREE.Vector3;
 const SIDES = { L: 1, R: -1 };
@@ -91,7 +93,9 @@ function semantic(q, kind, side, order) {
 }
 
 // ---------------------------------------------------------------- loading
-export async function loadBotRig(studio, { url = '../assets/models/bot_rig.glb', mats = botMaterials(), shadows = true } = {}) {
+// shoulders: false keeps the skin weights as exported (the armpit and shoulder-cap corrections of engine2/botjoint.js
+// off; for comparing)
+export async function loadBotRig(studio, { url = '../assets/models/bot_rig.glb', mats = botMaterials(), shadows = true, shoulders = true } = {}) {
   const g = await studio.gltf.loadAsync(url);
   const parts = {};
   const bones = {};
@@ -113,6 +117,7 @@ export async function loadBotRig(studio, { url = '../assets/models/bot_rig.glb',
     b.userData.restQ = b.quaternion.clone();
     b.userData.restP = b.position.clone();
   }
+  if (shoulders && parts.B_body && parts.B_body.isSkinnedMesh) freeFlanks(parts.B_body);
   const extras = g.parser.json.extras || {};
   for (const [k, v] of Object.entries(extras.legrest || {})) {
     if (v.some((x, i) => Math.abs(x - LEGREST[k][i]) > 2e-4)) console.warn(`botrig: ${k} differs from LEGREST (copy it again from blender/rig_bot.py's output)`);
