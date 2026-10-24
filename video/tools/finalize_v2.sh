@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Episode 1 v2.2, the realistic film: narration takes -> timeline -> score -> mix -> subtitles -> render -> mux.
+# Episode 1 v2, the realistic film: narration takes -> timeline -> score -> mix -> subtitles -> render -> mux.
+# (v2.3 re-rendered only the hook and the robot shots and spliced them into the v2.2 picture: tools/patch_v23.sh)
 # usage: tools/finalize_v2.sh [stage]   stage: audio (everything but the picture) | render | mux | all (default)
 #   RENDER_WORKERS=2 RENDER_SCALE=1 tools/finalize_v2.sh render
 set -euo pipefail

@@ -1,6 +1,6 @@
 # Shots — how the film is built
 
-Episode 1 《棋盘之外》 (v2.2) is a realistic 3D documentary film, 1920×1080, ~5.5 minutes, every frame rendered by
+Episode 1 《棋盘之外》 (v2.3) is a realistic 3D documentary film, 1920×1080, ~5.5 minutes, every frame rendered by
 three.js (r170) in headless Chromium on the CPU (SwiftShader: no GPU, 4 cores). Narration script:
 `data/script.json`; the per-sentence shot list: `../docs/ep01-storyboard-v2.md`.
 
