@@ -22,6 +22,7 @@ ap.add_argument("--takes", default="audio/takes")
 ap.add_argument("--out", default="audio")
 ap.add_argument("--force", default="", help="comma list UNIT=take overrides, e.g. U03=2")
 ap.add_argument("--reuse", action="store_true", help="skip scoring: reuse audio/takes_report.json and only re-assemble")
+ap.add_argument("--only", default="", help="comma list of units to (re)score; the rest reuse audio/takes_report.json")
 ap.add_argument("--lead", type=float, default=1.4, help="seconds of picture before the first word")
 args = ap.parse_args()
 torch.set_num_threads(int(os.environ.get("SEL_THREADS", "3")))
@@ -64,10 +65,12 @@ units = json.load(open(args.script, encoding="utf-8"))["units"]
 forced = dict(x.split("=") for x in args.force.split(",") if x)
 report, chosen = [], {}
 missing = []
-if args.reuse:
+only = set(x for x in args.only.split(",") if x)
+if args.reuse or only:
     report = json.load(open(os.path.join(args.out, "takes_report.json"), encoding="utf-8"))
+    report = [x for x in report if x["unit"] not in only]
 for u in units:
-    if args.reuse:
+    if args.reuse or (only and u["id"] not in only):
         recs = [x for x in report if x["unit"] == u["id"]]
         if not recs:
             missing.append(u["id"])

@@ -78,8 +78,8 @@ def shot(scene, start, end, p=None, cues=None, fadeIn=0.0, fadeOut=0.0, label=No
 def storyboard():
     S = []
     # hook
-    S.append(shot("go_place", 0.0, A("H1", "为什么", -0.08), p=dict(cam="hero", slow=2.6), cues=dict(contact=A("H1", "冠军", 0.05))))
-    S.append(shot("dish", A("H1", "为什么", -0.08), A("H1", "$", 0.5), cues=dict(slip=A("H1", "为什么", 0.25), impact=A("H1", "碗", 0.0))))
+    S.append(shot("go_place", 0.0, A("H1", "可为什么", -0.08), p=dict(cam="hero", slow=2.6), cues=dict(contact=A("H1", "冠军", 0.05))))
+    S.append(shot("dish", A("H1", "可为什么", -0.08), A("H1", "$", 0.5), cues=dict(slip=A("H1", "为什么", 0.25), impact=A("H1", "碗", 0.0))))
     S.append(shot("go_board", A("H1", "$", 0.5), A("H2", "$", 1.35), p=dict(mode="still", n=37, cam="macro", key=6)))
     # 1 第37手
     S.append(shot("hall", A("A01", "^", -0.7), A("A02", "^", -0.12), p=dict(mode="wide"), cues=dict(date=A("A01", "^", 0.0)), fadeIn=0.6))

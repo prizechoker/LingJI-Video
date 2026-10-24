@@ -1,14 +1,14 @@
 {
   "title": "棋盘之外",
   "series": "机器人发展史 · 第1集",
-  "version": "v2.2",
+  "version": "v2.3",
   "notes": "tts = text sent to the voice model (digits/English kept where the model reads them well); sub = on-screen text, 【】 gold highlight, 〔〕 cyan highlight, | line break; pause = silence after the unit in seconds.",
   "units": [
     {
       "id": "H1",
       "ch": 0,
-      "tts": "AI早就下赢了围棋世界冠军，为什么机器人到今天，还洗不好你家的碗？",
-      "sub": "AI早就下赢了围棋世界冠军，|为什么机器人到今天，|还【洗不好你家的碗】？",
+      "tts": "AI早就在棋盘上赢了世界冠军，可为什么到今天，机器人还洗不好你家的一只碗？",
+      "sub": "AI早就在棋盘上赢了世界冠军，|可为什么到今天，|机器人还【洗不好你家的一只碗】？",
       "pause": 0.55
     },
     {

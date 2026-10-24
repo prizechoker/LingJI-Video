@@ -38,8 +38,9 @@ for u in units:
     todo = [k for k in range(args.takes) if not os.path.exists(os.path.join(args.out, f"{u['id']}_t{k}.wav"))]
     if not todo:
         continue
-    # all missing takes of a unit in one batch: much better CPU throughput than one by one
-    torch.manual_seed(args.seed0 + sum(map(ord, u["id"])) * 13 + len(todo))
+    # all missing takes of a unit in one batch: much better CPU throughput than one by one (the seed also counts the
+    # first missing take, so takes added in later batches don't repeat earlier ones)
+    torch.manual_seed(args.seed0 + sum(map(ord, u["id"])) * 13 + len(todo) + 1000 * todo[0])
     t0 = time.time()
     n_chars = len(u["tts"])
     wavs, sr = model.generate_voice_clone(
